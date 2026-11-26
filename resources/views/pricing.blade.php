@@ -323,6 +323,14 @@
     .fit-plan .plan-btn.btn-outline:hover { border-color: var(--brand-accent); background: color-mix(in srgb, var(--brand-accent) 8%, transparent); }
     .plan-card .plan-btn.btn-primary:hover,
     .fit-plan .plan-btn.btn-primary:hover { transform: translateY(-1px); }
+    /* Phones: the cards come one under another, so a card's button is mostly the only one on
+       the screen, and an outline there reads as a side option. Every paid plan's button is
+       filled; the recommended plan keeps its violet edge and badge. Moving down a plan or to
+       Free keeps its outline. */
+    @media (max-width: 640px) {
+      .plan-card .plan-btn.btn-outline.is-buy { background: var(--brand-accent); color: #fff; border: 1px solid transparent; box-shadow: var(--lift); }
+      .plan-card .plan-btn.btn-outline.is-buy:hover { background: var(--brand-hover); border-color: transparent; }
+    }
 
     /* Minutes and the credits behind them on one line, minutes first, each number a size
        above its unit; a narrow card sets them smaller to keep the line (the credits go under

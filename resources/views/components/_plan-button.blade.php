@@ -25,8 +25,10 @@
     $yearlyLabel = __('ui.pricing.get_yearly_offer', ['percent' => $yearlySavePercent]);
     $yearlyBarLabel = __('ui.pricing.get_offer', ['percent' => $yearlySavePercent]);
   }
-  // The recommended plan gets the filled button; the others an outline.
-  $buttonClass = 'plan-btn '.($small ?? false ? 'plan-btn-sm ' : '').($state['is_popular'] ? 'btn-primary' : 'btn-outline');
+  // The recommended plan gets the filled button; the others an outline. A button that buys a
+  // paid plan is marked "is-buy": on phones every one of those is filled (pricing.blade.php).
+  $buttonClass = 'plan-btn '.($small ?? false ? 'plan-btn-sm ' : '').($state['is_popular'] ? 'btn-primary' : 'btn-outline')
+    .($plan['slug'] !== 'free' ? ' is-buy' : '');
   $disabledClass = 'plan-btn '.($small ?? false ? 'plan-btn-sm ' : '').'btn-disabled';
 @endphp
 @if($state['is_pack'])
