@@ -214,18 +214,21 @@ class ApiHistoryTest extends TestCase
     }
 
     /**
-     * Audio of a generation that is not finished, or that failed, is 409
-     * audio_not_ready.
+     * Audio of a generation that is not finished is 409 audio_not_ready (wait
+     * and ask again); of one that failed, 422 audio_failed (it never will be).
      */
-    public function test_audio_of_an_unfinished_or_failed_generation_is_409_audio_not_ready(): void
+    public function test_audio_of_an_unfinished_generation_is_409_and_of_a_failed_one_422(): void
     {
         $user = $this->apiMember();
         $plain = $this->issueKey($user)['plain'];
         $queued = $this->storedGeneration($user, ['status' => 'queued', 'audio_path' => null]);
         $failed = $this->storedGeneration($user, ['status' => 'failed', 'audio_path' => null]);
+        $gone = $this->storedGeneration($user, ['status' => 'done', 'audio_path' => null]);
 
         $this->assertApiError($this->apiGet($plain, '/history/'.$queued->id.'/audio'), 409, 'audio_not_ready', 'invalid_request_error', 'history_item_id');
-        $this->assertStringContainsString('failed', (string) $this->assertApiError($this->apiGet($plain, '/history/'.$failed->id.'/audio'), 409, 'audio_not_ready')->json('error.message'));
+        $this->assertApiError($this->apiGet($plain, '/history/'.$failed->id.'/audio'), 422, 'audio_failed', 'invalid_request_error', 'history_item_id');
+        // Finished, and its file since removed: gone, not "not ready".
+        $this->assertApiError($this->apiGet($plain, '/history/'.$gone->id.'/audio'), 410, 'audio_expired', 'invalid_request_error', 'history_item_id');
     }
 
     /**

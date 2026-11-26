@@ -71,7 +71,14 @@ class HistoryController extends Controller
     public function audio(Request $request, string $historyItemId): Response
     {
         $generation = $this->find($request, $historyItemId);
-        if ($generation->status !== 'done' || blank($generation->audio_path)) {
+        // A failed generation never gets audio: its own answer, so a caller waiting on "not ready" stops.
+        if ($generation->status === 'failed') {
+            throw ApiError::invalid('audio_failed', 'This generation failed, so it has no audio. Nothing was charged for it; generate it again.', 'history_item_id');
+        }
+        if ($generation->status === 'done' && blank($generation->audio_path)) {
+            throw new ApiError(410, ApiError::TYPE_INVALID_REQUEST, 'audio_expired', 'The audio file for this history item is no longer stored.', 'history_item_id');
+        }
+        if ($generation->status !== 'done') {
             throw ApiError::invalid('audio_not_ready', 'This history item has no audio yet (status: '.ApiPresenter::status($generation->status).').', 'history_item_id', 409);
         }
 

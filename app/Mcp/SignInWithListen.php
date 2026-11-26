@@ -72,6 +72,7 @@ final class SignInWithListen
             // The same request in the other language (the page's own switch: it has no /en or /ar address).
             'switchUrl' => $request->fullUrlWithQuery(['hl' => $locale === 'ar' ? 'en' : 'ar']),
             'returnsTo' => self::returnsTo((string) $request->query('redirect_uri', '')),
+            'isClaude' => self::isClaude((string) $parameters['client']->name, (string) $request->query('redirect_uri', '')),
             'status' => McpAccess::statusFor((int) $user->id, $plan),
             'planName' => $plan ? ($plan->getLocalizedName($locale) ?: (string) $plan->name) : __('ui.dashboard.free_plan'),
         ])->withHeaders(['Cache-Control' => 'no-store, private', 'X-Robots-Tag' => 'noindex, nofollow']);
@@ -96,6 +97,23 @@ final class SignInWithListen
         }
 
         return str_starts_with(strtolower(trim((string) $request->header('Accept-Language'))), 'ar') ? 'ar' : 'en';
+    }
+
+    /**
+     * Whether the app asking is Claude, so the page may show Claude's own mark
+     * (the owner's choice, CLAUDE.md): only when the access goes back to
+     * Claude's own site, or to Claude Code on the member's own computer. A
+     * name alone never earns the mark: any app may call itself "Claude".
+     */
+    public static function isClaude(string $name, string $redirectUri): bool
+    {
+        $scheme = strtolower((string) parse_url($redirectUri, PHP_URL_SCHEME));
+        $host = strtolower((string) parse_url($redirectUri, PHP_URL_HOST));
+        if ($scheme === 'https' && in_array($host, ['claude.ai', 'claude.com'], true)) {
+            return true;
+        }
+
+        return $scheme === 'http' && in_array($host, ['localhost', '127.0.0.1'], true) && str_starts_with($name, 'Claude Code');
     }
 
     /**

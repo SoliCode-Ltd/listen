@@ -167,7 +167,7 @@ final class OpenApiSpec
                                 'audio/flac' => ['schema' => ['type' => 'string', 'format' => 'binary']],
                             ],
                         ],
-                    ] + self::errorResponses(['400', '401', '402', '403', '404', '409', '422', '429', '502', '503']),
+                    ] + self::errorResponses(['400', '401', '402', '403', '404', '409', '410', '422', '429', '500', '502', '503']),
                 ],
             ],
             '/text-to-speech/{voice_id}/async' => [
@@ -181,10 +181,15 @@ final class OpenApiSpec
                     'responses' => [
                         '202' => [
                             'description' => 'Accepted; the generation is queued.',
-                            'headers' => ['Location' => self::header('string', 'URL of the history item.')],
+                            'headers' => [
+                                'Location' => self::header('string', 'URL of the history item.'),
+                                'X-History-Item-Id' => self::header('integer', 'History item of this generation.'),
+                                'X-Character-Count' => self::header('integer', 'Characters of the text that will be read.'),
+                                'Idempotent-Replayed' => self::header('string', '"true" when this is the saved result of an earlier request with the same Idempotency-Key.'),
+                            ],
                             'content' => ['application/json' => ['schema' => ['$ref' => '#/components/schemas/HistoryItem']]],
                         ],
-                    ] + self::errorResponses(['400', '401', '402', '403', '404', '409', '422', '429', '503']),
+                    ] + self::errorResponses(['400', '401', '402', '403', '404', '409', '410', '422', '429', '503']),
                 ],
             ],
             '/voices' => [
@@ -306,7 +311,7 @@ final class OpenApiSpec
                             'description' => 'The audio file.',
                             'content' => ['audio/mpeg' => ['schema' => ['type' => 'string', 'format' => 'binary']]],
                         ],
-                    ] + self::errorResponses(['401', '403', '404', '409', '410', '429']),
+                    ] + self::errorResponses(['401', '403', '404', '409', '410', '422', '429', '503']),
                 ],
             ],
             '/transcriptions' => [
@@ -773,16 +778,17 @@ final class OpenApiSpec
         $descriptions = [
             '400' => 'The body is not valid JSON, or the Idempotency-Key is too long.',
             '401' => 'Missing or invalid API key.',
-            '402' => 'Not enough credits on the plan or on the key\'s monthly limit, or the plan\'s monthly request limit is reached. For speech to text: not enough minutes left this month (minutes_exceeded).',
+            '402' => 'Not enough credits left (plan, gifted and extra credits together) or on the key\'s monthly limit, or the plan\'s monthly generation limit is reached. For speech to text: not enough minutes left this month (minutes_exceeded).',
             '403' => 'Your plan or key does not allow this: the API is not in your plan or starts after the first payment, the key lacks a permission, or an option is not in your plan (feature_not_in_plan, with the plans that include it).',
             '404' => 'Not found.',
             '409' => 'Not possible yet: the item is still being made, or a request with the same Idempotency-Key is still running.',
-            '410' => 'The audio is no longer stored.',
+            '410' => 'The audio is no longer stored, or the generation made with this Idempotency-Key was deleted (idempotent_result_deleted).',
             '413' => 'The file is larger than the upload limit.',
-            '422' => 'A parameter is not valid, or the Idempotency-Key was used for a different request.',
-            '429' => 'Rate, concurrency, background-queue or daily limit reached, for the whole account; see Retry-After.',
+            '422' => 'A parameter is not valid, the Idempotency-Key was used for a different request, or the generation failed and has no audio (audio_failed).',
+            '500' => 'Something went wrong; for audio_unavailable, the audio was made and is at GET /v1/history/{history_item_id}/audio.',
+            '429' => 'Rate, concurrency, background-queue or daily limit reached, for the whole account; follow Retry-After when it is sent.',
             '502' => 'The generation failed; no credits were charged.',
-            '503' => 'Briefly unavailable: an option (a sound environment or an audio format), the background queue (queue_unavailable, nothing charged), the service for everyone (server_busy), today\'s speech capacity (capacity_reached), or the whole API while paused (api_paused). See Retry-After.',
+            '503' => 'Briefly unavailable: an option (a sound environment or an audio format), the background queue (queue_unavailable, nothing charged), the service for everyone (server_busy), today\'s speech capacity (capacity_reached), or the whole API while paused (api_paused). Follow Retry-After when it is sent.',
         ];
 
         $responses = [];

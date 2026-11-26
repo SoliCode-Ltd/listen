@@ -51,6 +51,15 @@ These are the owner's standing instructions. Follow them in every session.
   site's public pages for visitors not signed in and on the free demo
   (`App\Support\Clarity`), never in the studio, for paying members, in the apps,
   or for visitors from the UK, the EEA or Switzerland.
+  A seventh exception the owner asked for (26 November 2026): the developers
+  page's AI apps (MCP) section names Claude and Claude Code, with the steps to
+  connect Listen in them, in English and Arabic (`lang/*/developers.php` →
+  `docs.mcp.claude`), in text only. And, asked for the same day: Claude's own
+  mark, the file from claude.ai unchanged (`public/images/partners/claude-mark.svg`),
+  in the app's tile on the page where a member allows an AI app
+  (`resources/views/oauth/authorize.blade.php`), the same size as Listen's own
+  mark beside it, only when the app asking really is Claude
+  (`App\Mcp\SignInWithListen::isClaude`). Nowhere else on the site.
 
 ## Email
 - Never send email. Draft it only, and let the owner send it.

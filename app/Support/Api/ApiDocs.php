@@ -357,6 +357,7 @@ final class ApiDocs
                 'path_params' => [$p('voice_id', 'string', true, $cloned ? 'voice_id' : 'voice_id_studio')],
                 'header_params' => [$p(ApiIdempotency::HEADER, 'string', false, 'idempotency_key')],
                 'body_params' => [$p('text', 'string', true, 'text'), $p('title', 'string', false, 'title'), $p('*', 'string', false, 'same_body')],
+                'headers' => ['Location', 'X-History-Item-Id', 'X-Character-Count', 'Idempotent-Replayed', 'X-Request-Id'],
                 'request' => ['POST', $baseUrl.'/text-to-speech/'.$voiceId.'/async', ['text' => $example['text'], 'dialect' => $example['dialect'], 'title' => $example['title']], null],
                 'response' => ['json', $json(['status' => 'queued', 'credits_used' => $sampleCredits, 'duration_seconds' => null, 'audio_url' => null] + $historyItem)],
             ],
@@ -534,7 +535,7 @@ final class ApiDocs
                     'name' => $arabic ? 'سارة' : 'Sara',
                     'email' => 'sara@example.com',
                     'created_at' => '2026-03-02T12:00:00+00:00',
-                    'subscription' => ['plan' => $subscription['plan'], 'credits' => $subscription['credits']],
+                    'subscription' => $subscription,
                 ])],
             ],
         ];
@@ -556,7 +557,8 @@ final class ApiDocs
             'error' => [
                 'type' => ApiError::TYPE_QUOTA,
                 'code' => 'quota_exceeded',
-                'message' => 'Your monthly credits are used up. Please upgrade your plan to continue.',
+                // The message the API sends with these numbers (lang/en/ui.php, backend.monthly_chars_not_enough).
+                'message' => 'You have 120 credits left this month and this text needs about 450. Shorten it, or upgrade your plan for more credits.',
                 'param' => null,
                 'credits_needed' => 450,
                 'credits_remaining' => 120,
@@ -629,6 +631,12 @@ final class ApiDocs
             'quickstart' => self::highlighted(ApiCodeSamples::all('POST', $baseUrl.'/text-to-speech/'.$voiceId.'?output_format=mp3', $ttsBody, 'speech.mp3')),
             'env' => CodeHighlighter::html('export LISTEN_API_KEY="lsk_live_..."', 'bash'),
             // How an AI app is pointed at the MCP server (routes/ai.php), in the settings shape most of them read.
+            // Claude Code: sign in with Listen, or (on plans with the developer API) a key.
+            'mcp_claude_code' => CodeHighlighter::html(
+                "# Sign in with Listen\nclaude mcp add --transport http listen \\\n  ".url('/mcp')
+                ."\n\n# Or with an API key\nclaude mcp add --transport http listen \\\n  ".url('/mcp')." \\\n  --header \"Authorization: Bearer lsk_live_...\"",
+                'bash',
+            ),
             'mcp_config' => CodeHighlighter::html($json(['mcpServers' => ['listen' => [
                 'type' => 'http',
                 'url' => url('/mcp'),
