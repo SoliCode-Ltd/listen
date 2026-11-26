@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Support\MemberReach;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -36,7 +37,7 @@ class HomeInceptionTest extends TestCase
     public function test_with_the_reach_section_the_strip_sits_right_under_it(): void
     {
         // Enough members in enough countries for the reach section to show, without making them all.
-        cache()->put('member_reach:v1', ['members' => 9483, 'countries' => ['EG' => 4623, 'SA' => 1019, 'US' => 120, 'DE' => 99, 'FR' => 74, 'GB' => 45]], 60);
+        cache()->put(MemberReach::CACHE_KEY, ['members' => 9483, 'countries' => ['EG' => 4623, 'SA' => 1019, 'US' => 120, 'DE' => 99, 'FR' => 74, 'GB' => 45]], 60);
 
         app()->setLocale('en');
         $html = $this->getLocalizedRoute('home')->assertOk()->getContent();
