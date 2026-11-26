@@ -23,7 +23,7 @@ use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
  */
 #[Name('list_voices')]
 #[Title('List voices')]
-#[Description('List the Listen voices this account can use, with their voice_id, language, gender and accent, and a short sample to play. Filter by language (ar or en), gender or a word such as a name or an accent. Includes the person\'s own cloned voices on plans with cloning.')]
+#[Description('List the Listen voices this account can use, with their voice_id, language and gender, and a short sample to play. Every voice speaks any dialect or accent of its language (an Arabic voice reads Egyptian, Saudi, Lebanese and the rest): choose a voice here by language and gender, or by name, and give the dialect to text_to_speech. Includes the person\'s own cloned voices on plans with cloning.')]
 #[IsReadOnly]
 #[IsIdempotent]
 #[IsOpenWorld(false)]
@@ -44,7 +44,7 @@ class ListVoices extends ListenTool
             'gender' => $schema->string()->enum(['female', 'male'])
                 ->description('Only female or only male voices.'),
             'search' => $schema->string()->max(60)
-                ->description('A word to look for in the voice\'s name or accent, for example Egyptian or British.'),
+                ->description('A word to look for in a voice\'s name, for example Sara or Omar. Not a dialect or accent: every voice speaks them all, so leave this out to choose by language and gender.'),
             'offset' => $schema->integer()->min(0)
                 ->description('For the next page: how many voices to skip.'),
         ];
@@ -87,8 +87,11 @@ class ListVoices extends ListenTool
         $lines = array_map(static fn (array $voice): string => '- '.$voice['voice_id'].': '.$voice['name']
             .' ('.implode(', ', array_filter([$voice['language'], $voice['gender'], $voice['accent'], $voice['category'] === 'cloned' ? 'your cloned voice' : null])).')'
             .($voice['available_on_plan'] ? '' : ' [not on this plan]'), $page);
+        // A search for a dialect finds no name: say why, so the assistant does not conclude there is no such voice.
         $text = $page === []
-            ? 'No voices match. Try without search, or another language.'
+            ? ($search !== ''
+                ? 'No voice has "'.$search.'" in its name. Voices are not tied to a dialect or accent: every voice speaks any of its language. Call list_voices again without search (filter by language and gender), choose a voice, and give the dialect code from get_voice_options to text_to_speech.'
+                : 'No voices match. Try another language or gender.')
             : $total.' voices'.($total > count($page) ? ', showing '.($offset + 1).' to '.($offset + count($page)) : '').":\n".implode("\n", $lines)
                 .($next !== null ? "\nMore: call again with offset = {$next}." : '');
 

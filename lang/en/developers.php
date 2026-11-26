@@ -221,7 +221,7 @@ return [
             'tools_title' => 'Tools',
             'tools_body' => 'The app sees only the tools its key\'s permissions allow.',
             'tools' => [
-                'list_voices' => 'Lists the voices you can use, by language, gender or accent.',
+                'list_voices' => 'Lists the voices you can use, by language, gender or name. Every voice speaks any dialect of its language.',
                 'get_voice_options' => 'Lists the dialects, accents, styles and emotions, and what your plan includes.',
                 'text_to_speech' => 'Makes speech and gives a link to play or download it.',
                 'get_speech' => 'Checks on a recording and gives a new link to it.',
