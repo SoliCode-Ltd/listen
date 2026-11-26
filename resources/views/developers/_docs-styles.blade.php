@@ -176,6 +176,7 @@
     .docs-subrow > .docs-text > h4:first-child, .docs-subrow > h4:first-child { margin-top: 0; font-size: 1.22rem; }
     /* The name of a button or menu in another app's own screen. */
     .docs-ui { font-weight: 620; color: var(--text); white-space: nowrap; }
+    .docs-ui-as { font-size: .86em; color: var(--muted); white-space: nowrap; unicode-bidi: isolate; }
     html[dir="rtl"] :is(.docs-section h3, .docs-resource h3, .docs-text h4) { letter-spacing: 0; }
     .docs-section p, .docs-section li, .docs-resource > p { color: var(--muted); line-height: 1.75; font-size: 1.04rem; }
     .docs-section p { margin: 0 0 1rem; }

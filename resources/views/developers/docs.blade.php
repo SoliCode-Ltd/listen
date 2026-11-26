@@ -246,7 +246,11 @@
         {{-- Claude, step by step (named here by the owner's choice, CLAUDE.md). Its buttons keep their own English names. --}}
         @php
           $mcpUrl = url('/mcp');
-          $ui = fn (string $text) => preg_replace('/\*\*([^*]+)\*\*/', '<strong class="docs-ui" dir="auto">$1</strong>', \App\Support\Api\ApiDocs::richText(str_replace(':url', $mcpUrl, $text)));
+          // **name** is a button; **meaning|Name** gives its meaning in the page's language, then its name as that screen shows it.
+          $ui = fn (string $text) => preg_replace(
+              ['/\*\*([^*|]+)\|([^*]+)\*\*/', '/\*\*([^*]+)\*\*/'],
+              ['<strong class="docs-ui" dir="auto">$1</strong> <span class="docs-ui-as" dir="ltr">($2)</span>', '<strong class="docs-ui" dir="auto">$1</strong>'],
+              \App\Support\Api\ApiDocs::richText(str_replace(':url', $mcpUrl, $text)));
         @endphp
         <div class="docs-text docs-subrow" id="mcp-claude">
           <h4>{{ $plain('mcp.claude.title') }}{!! $anchor('mcp-claude') !!}</h4>

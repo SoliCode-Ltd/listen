@@ -105,7 +105,9 @@ class DeveloperDocsWordingTest extends TestCase
             ->assertSee('If something does not work');
         $this->docs('ar')
             ->assertSee('الربط في Claude')
-            ->assertSee('<strong class="docs-ui" dir="auto">Add custom connector</strong>', false)
+            // Arabic first, then the button's name as Claude's screen shows it.
+            ->assertSee('<strong class="docs-ui" dir="auto">إضافة موصّل مخصص</strong> <span class="docs-ui-as" dir="ltr">(Add custom connector)</span>', false)
+            ->assertSee('<strong class="docs-ui" dir="auto">إسمع</strong>', false)
             ->assertSee('الربط في Claude Code')
             ->assertSee('إذا لم يعمل شيء');
 
