@@ -25,12 +25,22 @@ class LocalizedPricingService
     private const FX_CHECKED_CACHE_KEY = 'billing:usd_fx_rates:checked';
 
     /**
-     * Fast local mapping for common countries. Remote lookup is used as fallback.
+     * Countries whose currency is set here. Every other country gets the
+     * currency PHP itself knows for it (currencyForCountryCode).
+     *
+     * Yemen, Syria and Sudan are shown in dollars on purpose (the owner's choice,
+     * November 2026): the rate the rate service gives for their money can be far
+     * from what people pay (Yemen's rial trades at two different rates in different
+     * parts of the country), so a converted price would mislead, and the card is
+     * charged in dollars anyway.
      *
      * @var array<string, string>
      */
     private const COUNTRY_CURRENCY_MAP = [
         'US' => 'USD',
+        'YE' => 'USD',
+        'SY' => 'USD',
+        'SD' => 'USD',
         'EG' => 'EGP',
         'AE' => 'AED',
         'SA' => 'SAR',
@@ -365,9 +375,7 @@ class LocalizedPricingService
     {
         $locale = strtolower(trim((string) ($locale ?: app()->getLocale())));
         $whole = (int) ceil(max(0, $amountMinor) / 100);
-        $formatterLocale = $locale === 'ar'
-            ? (strtoupper($currency) === self::CURRENCY_EGP ? 'ar_EG@numbers=latn' : 'ar@numbers=latn')
-            : 'en_US';
+        $formatterLocale = $this->formatterLocale($locale, $currency);
 
         if (class_exists(NumberFormatter::class)) {
             $formatter = new NumberFormatter($formatterLocale, NumberFormatter::CURRENCY);
@@ -381,12 +389,24 @@ class LocalizedPricingService
         return $this->normalizeToLatinDigits(strtoupper($currency).' '.number_format($whole));
     }
 
+    /**
+     * The formatter's locale. Dollars are written the same on the Arabic pages as on the
+     * English ones ("$4"): Arabic's own form is "4 US$", which reads oddly beside "/شهر".
+     */
+    private function formatterLocale(string $locale, string $currency): string
+    {
+        $currency = strtoupper($currency);
+        if ($locale !== 'ar' || $currency === self::CURRENCY_USD) {
+            return 'en_US';
+        }
+
+        return $currency === self::CURRENCY_EGP ? 'ar_EG@numbers=latn' : 'ar@numbers=latn';
+    }
+
     public function formatAmount(int $amountMinor, string $currency, ?string $locale = null): string
     {
         $locale = strtolower(trim((string) ($locale ?: app()->getLocale())));
-        $formatterLocale = $locale === 'ar'
-            ? ($currency === self::CURRENCY_EGP ? 'ar_EG@numbers=latn' : 'ar@numbers=latn')
-            : 'en_US';
+        $formatterLocale = $this->formatterLocale($locale, $currency);
 
         $isEgp = strtoupper($currency) === self::CURRENCY_EGP;
         $amount = $amountMinor / 100;
@@ -769,38 +789,17 @@ class LocalizedPricingService
             return self::COUNTRY_CURRENCY_MAP[$countryCode];
         }
 
-        return Cache::remember('billing:country_currency:'.$countryCode, now()->addDays(30), function () use ($countryCode): ?string {
-            try {
-                $response = Http::timeout(3)
-                    ->acceptJson()
-                    ->get('https://restcountries.com/v3.1/alpha/'.$countryCode, [
-                        'fields' => 'currencies',
-                    ]);
+        // The outside service once asked here has retired its answers (every country came
+        // back without a currency, so in dollars). PHP's own list knows each country's
+        // currency, with no request and no wait; "XXX" is its "no currency".
+        try {
+            $code = strtoupper((string) (new NumberFormatter('en_'.$countryCode, NumberFormatter::CURRENCY))
+                ->getTextAttribute(NumberFormatter::CURRENCY_CODE));
+        } catch (\Throwable) {
+            return null;
+        }
 
-                if (! $response->ok()) {
-                    return null;
-                }
-
-                $body = $response->json();
-                $currencies = [];
-
-                if (is_array($body) && array_is_list($body)) {
-                    $currencies = $body[0]['currencies'] ?? [];
-                } elseif (is_array($body)) {
-                    $currencies = $body['currencies'] ?? [];
-                }
-
-                if (! is_array($currencies) || $currencies === []) {
-                    return null;
-                }
-
-                $code = strtoupper((string) array_key_first($currencies));
-
-                return strlen($code) === 3 ? $code : null;
-            } catch (\Throwable) {
-                return null;
-            }
-        });
+        return preg_match('/^[A-Z]{3}$/', $code) === 1 && $code !== 'XXX' ? $code : null;
     }
 
     private function countryFromIpLookup(?Request $request): ?string
@@ -970,6 +969,7 @@ class LocalizedPricingService
                 if ($this->isLocalIp($candidate)) {
                     continue;
                 }
+
                 return $candidate;
             }
         }
@@ -982,6 +982,7 @@ class LocalizedPricingService
                     if ($this->isLocalIp($ip)) {
                         continue;
                     }
+
                     return $ip;
                 }
             }
