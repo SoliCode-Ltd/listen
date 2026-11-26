@@ -8,6 +8,7 @@ use App\Mcp\SpeechLinks;
 use App\Mcp\SpeechSummary;
 use App\Models\AudioGeneration;
 use App\Models\UsageCounter;
+use App\Services\Api\ApiConcurrency;
 use App\Services\Api\ApiSpeechService;
 use App\Support\Api\ApiError;
 use App\Support\Api\ApiPlanAccess;
@@ -126,9 +127,14 @@ class TextToSpeech extends ListenTool
         $this->throttle($caller);
 
         $started = microtime(true);
-        $item = $caller->call(TextToSpeechController::class, 'convertAsync', 'POST', '/text-to-speech/'.rawurlencode($voiceId).'/async', $body, [$voiceId]);
-        $historyItemId = (int) $item['history_item_id'];
-        $generation = $this->waitFor($historyItemId, $started + max(0, (int) config('listen.mcp.wait_seconds', 40)));
+        // A short text is made here and now, as the studio makes it (a few seconds). A long one, or one
+        // that finds every place taken, goes on the queue, and is waited for as long as an AI app waits.
+        $generation = $this->makeNow($caller, $voiceId, $body);
+        if ($generation === null) {
+            $queued = $caller->call(TextToSpeechController::class, 'convertAsync', 'POST', '/text-to-speech/'.rawurlencode($voiceId).'/async', $body, [$voiceId]);
+            $generation = $this->waitFor((int) $queued['history_item_id'], $started + max(0, (int) config('listen.mcp.wait_seconds', 40)));
+        }
+        $historyItemId = (int) $generation->id;
         $item = ApiPresenter::historyItem($generation);
         $caller->log($this->name(), [
             'history_item_id' => $historyItemId,
@@ -161,6 +167,58 @@ class TextToSpeech extends ListenTool
                 description: 'Speech made with Listen; '.SpeechLinks::lasts($speech['audio_url_expires_at']).'.',
             ),
         ])->withStructuredContent($speech);
+    }
+
+    /**
+     * The speech made in this request, as the API's own "wait for the file"
+     * endpoint makes it, with the same checks, credits and places at once;
+     * or null when it should go on the queue instead: the text is long
+     * (listen.mcp.now_characters), or every place is taken. Making it holds a
+     * web worker, as waiting for the queue does, so it shares those few slots
+     * (listen.mcp.waiting_slots).
+     *
+     * @param  array<string, mixed>  $body
+     */
+    private function makeNow(McpCaller $caller, string $voiceId, array $body): ?AudioGeneration
+    {
+        $limit = max(0, (int) config('listen.mcp.now_characters', 1500));
+        if ($limit === 0 || mb_strlen((string) $body['text']) > $limit) {
+            return null;
+        }
+        $waiting = self::waitingSlot(max(1, (int) config('listen.mcp.wait_seconds', 40)) + 60);
+        if ($waiting === false) {
+            return null;
+        }
+
+        $slot = null;
+        try {
+            $speech = app(ApiSpeechService::class);
+            try {
+                $spec = $speech->prepare($caller->request('POST', '/text-to-speech/'.rawurlencode($voiceId), $body),
+                    $caller->user, $caller->plan, $caller->quotaPlan, $voiceId, false);
+                $slot = app(ApiConcurrency::class)->acquire((int) $caller->user->id, ApiPlanAccess::concurrency($caller->plan));
+            } catch (ApiError $e) {
+                // Too long for one waited request on this plan, or no place free: the queue's own rules decide.
+                if (in_array($e->errorCode, ['text_too_long', 'concurrency_limit_exceeded', 'server_busy'], true)) {
+                    return null;
+                }
+
+                throw $e;
+            }
+
+            // Never cut a paid generation short: it finishes (and is charged or given back)
+            // even if the app stops waiting.
+            ignore_user_abort(true);
+            $seconds = (int) ini_get('max_execution_time');
+            if ($seconds > 0 && function_exists('set_time_limit')) {
+                @set_time_limit(max(300, $seconds));
+            }
+
+            return $speech->generate($caller->user, $caller->apiKey, $caller->plan, $caller->quotaPlan, $spec, false);
+        } finally {
+            $slot?->release();
+            $waiting->release();
+        }
     }
 
     /**
