@@ -22,6 +22,9 @@ final class MemberReach
     /** Members per country that light a country at each step: some, many, the most. */
     public const TIERS = [1 => 1, 2 => 50, 3 => 500];
 
+    /** Countries the globe never lights or names, whatever their members (the owner's choice). They still count in the totals. */
+    public const NOT_ON_GLOBE = ['IL'];
+
     /**
      * @return array{members: int, countries: array<string, int>}
      */
@@ -87,7 +90,7 @@ final class MemberReach
         $hub = [26.0, 38.0]; // between Egypt and the Gulf
         $out = [];
         foreach (self::counts()['countries'] as $code => $n) {
-            if (! isset($points[$code])) {
+            if (! isset($points[$code]) || in_array($code, self::NOT_ON_GLOBE, true)) {
                 continue;
             }
             $out[] = ['code' => $code, 'at' => $points[$code], 'tier' => self::tierFor($n), 'arc' => self::arc($hub, $points[$code])];

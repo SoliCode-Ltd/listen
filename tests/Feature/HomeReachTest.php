@@ -84,6 +84,21 @@ class HomeReachTest extends TestCase
         $this->assertEqualsWithDelta(2.4, $lon, 1.0);
     }
 
+    public function test_israel_is_not_lit_or_named_on_the_globe(): void
+    {
+        $this->members(['EG' => 60, 'SA' => 30, 'US' => 10, 'DE' => 8, 'FR' => 7, 'IL' => 19]);
+
+        $this->assertNotContains('IL', array_column(MemberReach::markers(), 'code'));
+        $this->assertCount(5, MemberReach::markers());
+
+        foreach (['en' => 'Israel', 'ar' => 'إسرائيل'] as $locale => $name) {
+            app()->setLocale($locale);
+            $html = view('components.home.reach')->render();
+            $this->assertStringNotContainsString(substr(json_encode(['name' => $name]), 1, -1), $html);
+            $this->assertStringNotContainsString('"flag":"il"', $html);
+        }
+    }
+
     public function test_each_light_carries_its_country_name_in_the_page_language(): void
     {
         $this->members(['EG' => 60, 'SA' => 30, 'US' => 10, 'DE' => 8, 'FR' => 7]);
