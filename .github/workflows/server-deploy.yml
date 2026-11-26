@@ -129,6 +129,13 @@ name: Server deploy
 #            today's rule would refuse, and the words it used most (words and
 #            counts only, never a text). For finding out how a member's voices
 #            got past the wording rule (scripts/support/member_audio_check.php).
+#   prices-check: read-only. Every country's prices: for each country, the
+#            currency a visitor from there sees and each active plan's monthly
+#            and yearly price in it, worked out by the site's own code; checks
+#            each is the dollar price times the rate once, that the written price
+#            reads back as that amount (English and Arabic), and compares the
+#            rates with a second source. Countries, currencies and prices only
+#            (scripts/support/prices_world_check.php).
 #   readings-check: read-only. What the automatic pronunciation step did on
 #            the voices of the last days (input "member": empty for 7, or a
 #            number of days): the switch and its test accounts, on how many
@@ -269,7 +276,7 @@ on:
         default: staging
       mode:
         type: choice
-        options: [inspect, deploy, ffmpeg, indexnow, migrate, composer, house-agent, house-agent-off, queue, settings, php-limits, data-checks, email-check, member-audio-check, readings-check, content-check, upgrade-check, upgrade-test, demo-links, promises, speech-rates, speed-check, owner-todo, plan-lines, plan-lines-apply, agent-plans, join-check, wording-blocks, wording-blocks-apply, page-check, extra-credits-test, billing-trace, chatgpt-ads-check, plan-audit, dub-test, stt-test, stt-check, stt-queue, stt-preview, voice-design-test, voice-design-log, voice-cloning-examples, agent-redteam, plan-price, plan-price-apply, newsletter-draft, newsletter-draft-save]
+        options: [inspect, deploy, ffmpeg, indexnow, migrate, composer, house-agent, house-agent-off, queue, settings, php-limits, data-checks, email-check, member-audio-check, readings-check, content-check, upgrade-check, upgrade-test, demo-links, promises, speech-rates, speed-check, owner-todo, plan-lines, plan-lines-apply, agent-plans, join-check, prices-check, wording-blocks, wording-blocks-apply, page-check, extra-credits-test, billing-trace, chatgpt-ads-check, plan-audit, dub-test, stt-test, stt-check, stt-queue, stt-preview, voice-design-test, voice-design-log, voice-cloning-examples, agent-redteam, plan-price, plan-price-apply, newsletter-draft, newsletter-draft-save]
         default: inspect
       customer:
         description: "billing-trace and chatgpt-ads-check: the Stripe customer id (cus_...)"
@@ -665,6 +672,12 @@ jobs:
             [ "$TARGET" = staging ] || { echo "upgrade-test runs on staging only"; exit 1; }
             failed=0
             for B in classic flexible; do $S "$FIND; BILLING_MODE=$B php" < scripts/support/upgrade_stripe_test.php || failed=1; done
+            rm -f ~/.ssh/id_deploy
+            exit "$failed"
+          fi
+          if [ "$MODE" = prices-check ]; then
+            failed=0
+            tool prices_world_check.php | $S "$FIND; nice php" || failed=1
             rm -f ~/.ssh/id_deploy
             exit "$failed"
           fi
