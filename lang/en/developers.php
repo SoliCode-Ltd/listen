@@ -222,9 +222,9 @@ return [
             'tools_body' => 'The app sees only the tools its key\'s permissions allow.',
             'tools' => [
                 'list_voices' => 'Lists the voices you can use, by language, gender or name. Every voice speaks any dialect of its language.',
-                'get_voice_options' => 'Lists the dialects, accents, styles and emotions, and what your plan includes.',
-                'text_to_speech' => 'Makes speech and gives a link to play or download it.',
-                'get_speech' => 'Checks on a recording and gives a new link to it.',
+                'get_voice_options' => 'Lists the dialects, accents, styles, emotions, sound environments and file types, and what your plan includes.',
+                'text_to_speech' => 'Makes speech and gives a link to play or download it, with the studio\'s options: dialect, style, emotion, speed, pitch, sound environment, dialogue, translation and file type.',
+                'get_speech' => 'Checks on a recording and gives a new link to it, in another file type if you ask.',
                 'list_speech_history' => 'Lists your recent recordings.',
                 'transcribe_audio' => 'Turns a recording into text, from a link to the file.',
                 'get_transcription' => 'Gives the text of a transcription, or its subtitles, in its language or translated.',

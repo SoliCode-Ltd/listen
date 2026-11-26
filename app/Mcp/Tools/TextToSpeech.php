@@ -41,7 +41,7 @@ use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
  */
 #[Name('text_to_speech')]
 #[Title('Make speech')]
-#[Description('Turn Arabic or English text into speech with a Listen voice. Returns a link the person can play or download, for as many days as their plan keeps audio history. Uses the account\'s credits: '.Credits::PER_SECOND.' credits per second of audio. Pick voice_id with list_voices first; dialect, style and emotion codes come from get_voice_options.')]
+#[Description('Turn Arabic or English text into speech with a Listen voice. Returns a link the person can play or download, for as many days as their plan keeps audio history. Uses the account\'s credits: '.Credits::PER_SECOND.' credits per second of audio. Pick voice_id with list_voices first; dialect, style, emotion and sound environment codes come from get_voice_options. It can also change the speed and pitch, translate the text into the voice\'s language first, and give the recording as another file type.')]
 #[IsReadOnly(false)]
 #[IsDestructive(false)]
 #[IsIdempotent(false)]
@@ -68,6 +68,14 @@ class TextToSpeech extends ListenTool
                 ->description('Emotion code from get_voice_options, for example warm or excited. Leave out for the default.'),
             'speed' => $schema->number()->min(0.5)->max(2)
                 ->description('Speaking speed from 0.5 to 2. Default 1.'),
+            'pitch' => $schema->number()->min(-10)->max(10)
+                ->description('Voice pitch from -10 (lower) to 10 (higher). Default 0.'),
+            'audio_effect' => $schema->string()
+                ->description('Sound environment code from get_voice_options for the whole recording, for example hall, phone or radio. Only on plans that include sound environments. Leave out for the clean voice.'),
+            'translate' => $schema->boolean()
+                ->description('true to translate the text into the voice\'s language before reading it (English text read by an Arabic voice, in Arabic). Leave out to read the text as written.'),
+            'output_format' => $schema->string()
+                ->description('File type of the recording\'s link: mp3 (the default) or another one the plan includes, listed by get_voice_options (such as wav or m4a).'),
             'style_prompt' => $schema->string()->max(2000)
                 ->description('Your own direction for the delivery, in a sentence or two. Only on plans that include custom direction.'),
             'title' => $schema->string()->max(255)
@@ -88,8 +96,13 @@ class TextToSpeech extends ListenTool
             'text' => ['required', 'string'],
             'voice_id' => ['required', 'string', 'max:40'],
             'speed' => ['nullable', 'numeric', 'min:0.5', 'max:2'],
+            'pitch' => ['nullable', 'numeric', 'min:-10', 'max:10'],
+            'audio_effect' => ['nullable', 'string', 'max:40'],
+            'translate' => ['nullable', 'boolean'],
+            'output_format' => ['nullable', 'string', 'max:10'],
             'dialogue' => ['nullable', 'array'],
         ]);
+        $format = strtolower(trim((string) ($input['output_format'] ?? ''))) ?: 'mp3';
         $voiceId = trim((string) $input['voice_id']);
 
         $body = array_filter([
@@ -99,7 +112,14 @@ class TextToSpeech extends ListenTool
             'emotion' => $request->get('emotion'),
             'style_prompt' => $request->get('style_prompt'),
             'title' => $request->get('title'),
-            'voice_settings' => isset($input['speed']) ? ['speed' => (float) $input['speed']] : null,
+            'voice_settings' => array_filter([
+                'speed' => isset($input['speed']) ? (float) $input['speed'] : null,
+                'pitch' => isset($input['pitch']) ? (float) $input['pitch'] : null,
+            ], static fn ($value): bool => $value !== null) ?: null,
+            'audio_effect' => $input['audio_effect'] ?? null,
+            'translate' => ! empty($input['translate']) ? true : null,
+            // The API checks the file type against the plan; the link then serves that type (SpeechLinks).
+            'output_format' => $format !== 'mp3' ? $format : null,
             'dialogue' => ! empty($input['dialogue']) ? ['speakers' => array_values((array) $input['dialogue'])] : null,
         ], static fn ($value): bool => $value !== null && $value !== '');
 
@@ -122,7 +142,7 @@ class TextToSpeech extends ListenTool
             return Response::error('generation_failed: '.rtrim((string) ($item['error']['message'] ?? 'Voice generation failed.'), '.').'. No credits were charged. You can try again.');
         }
 
-        $speech = SpeechLinks::withLink($item, SpeechLinks::daysFor($caller->user)) + ['credits_remaining' => self::creditsRemaining($generation, $caller)];
+        $speech = SpeechLinks::withLink($item, SpeechLinks::daysFor($caller->user), $format) + ['credits_remaining' => self::creditsRemaining($generation, $caller)];
 
         if ($item['status'] !== 'completed') {
             return Response::make([Response::text(implode("\n", [
@@ -135,8 +155,8 @@ class TextToSpeech extends ListenTool
             Response::text(SpeechSummary::text($speech)),
             Response::resourceLink(
                 $speech['audio_url'],
-                name: SpeechLinks::fileName($historyItemId, $generation->audio_path),
-                mimeType: SpeechLinks::mimeType($generation->audio_path),
+                name: SpeechLinks::fileName($historyItemId, $generation->audio_path, $format),
+                mimeType: SpeechLinks::mimeType($generation->audio_path, $format),
                 title: SpeechSummary::title($speech),
                 description: 'Speech made with Listen; '.SpeechLinks::lasts($speech['audio_url_expires_at']).'.',
             ),

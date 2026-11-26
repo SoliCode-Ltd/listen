@@ -27,19 +27,30 @@ final class SpeechLinks
         return VideoDubbing::keepDaysFor((int) $user->id);
     }
 
-    /** @return array{url: string, expires_at: string|null} */
-    public static function sign(int $historyItemId, int $days): array
+    /**
+     * @param  string|null  $format  a file type other than mp3 the link should serve (checked against the plan by whoever asks)
+     * @return array{url: string, expires_at: string|null}
+     */
+    public static function sign(int $historyItemId, int $days, ?string $format = null): array
     {
+        // Part of the signed address, so the type cannot be changed on a link.
+        $parameters = ['generation' => $historyItemId] + (self::asks($format) ? ['format' => $format] : []);
         if ($days <= 0) {
-            return ['url' => URL::signedRoute('mcp.audio', ['generation' => $historyItemId]), 'expires_at' => null];
+            return ['url' => URL::signedRoute('mcp.audio', $parameters), 'expires_at' => null];
         }
 
         $expires = Carbon::now()->addDays($days);
 
         return [
-            'url' => URL::temporarySignedRoute('mcp.audio', $expires, ['generation' => $historyItemId]),
+            'url' => URL::temporarySignedRoute('mcp.audio', $expires, $parameters),
             'expires_at' => $expires->toIso8601String(),
         ];
+    }
+
+    /** Whether a file type other than the default was asked for. */
+    private static function asks(?string $format): bool
+    {
+        return $format !== null && $format !== 'mp3' && isset(AudioFormats::ALL[$format]);
     }
 
     /** How long a link works, in words the assistant can pass on. */
@@ -59,9 +70,9 @@ final class SpeechLinks
      * @param  int  $days  daysFor() the member
      * @return array<string, mixed>
      */
-    public static function withLink(array $item, int $days): array
+    public static function withLink(array $item, int $days, ?string $format = null): array
     {
-        $link = ($item['audio_url'] ?? null) !== null ? self::sign((int) $item['history_item_id'], $days) : null;
+        $link = ($item['audio_url'] ?? null) !== null ? self::sign((int) $item['history_item_id'], $days, $format) : null;
         $item['audio_url'] = $link['url'] ?? null;
         $item['audio_url_expires_at'] = $link['expires_at'] ?? null;
 
@@ -69,15 +80,15 @@ final class SpeechLinks
     }
 
     /** The file's media type, from its stored name. */
-    public static function mimeType(?string $path): string
+    public static function mimeType(?string $path, ?string $format = null): string
     {
-        return AudioFormats::ALL[self::extension($path)]['mime'];
+        return AudioFormats::ALL[self::asks($format) ? $format : self::extension($path)]['mime'];
     }
 
     /** What the file is called when it is downloaded: listen-123.mp3 */
-    public static function fileName(int $historyItemId, ?string $path): string
+    public static function fileName(int $historyItemId, ?string $path, ?string $format = null): string
     {
-        return 'listen-'.$historyItemId.'.'.self::extension($path);
+        return 'listen-'.$historyItemId.'.'.(self::asks($format) ? $format : self::extension($path));
     }
 
     private static function extension(?string $path): string
