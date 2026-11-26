@@ -306,6 +306,11 @@ class McpServerTest extends TestCase
         $this->assertEqualsCanonicalizing([self::voiceId($maya), self::voiceId($omar)], array_column($voices['voices'], 'voice_id'));
         $this->assertSame([self::voiceId($omar)], array_column($this->callTool($plain, 'list_voices', ['language' => 'ar'])->json('result.structuredContent.voices'), 'voice_id'));
         $this->assertSame([self::voiceId($maya)], array_column($this->callTool($plain, 'list_voices', ['search' => 'may'])->json('result.structuredContent.voices'), 'voice_id'));
+        // Searching for a dialect finds no name: the answer says every voice speaks it, so the assistant goes on to choose one.
+        $byDialect = $this->callTool($plain, 'list_voices', ['language' => 'ar', 'search' => 'Egyptian'])->assertJsonPath('result.isError', false)->json('result');
+        $this->assertSame([], $byDialect['structuredContent']['voices']);
+        $this->assertStringContainsString('every voice speaks any of its language', $byDialect['content'][0]['text']);
+        $this->assertStringContainsString('without search', $byDialect['content'][0]['text']);
 
         $options = $this->callTool($plain, 'get_voice_options')->json('result');
         $this->assertContains('ar-EG', array_column($options['structuredContent']['dialects']['ar'], 'value'));
