@@ -22,6 +22,7 @@
   .connect-mark { flex: none; display: grid; place-items: center; width: 56px; height: 56px; border-radius: 16px; }
   .connect-mark.is-listen { background: var(--brand-accent); }
   .connect-mark.is-listen svg { width: 34px; height: 34px; }
+  .connect-mark.is-claude img { display: block; width: 34px; height: 34px; }
   .connect-mark.is-app { border: 1px solid var(--line); background: color-mix(in oklab, var(--text) 4%, var(--surface)); color: var(--text); font-size: 1.45rem; font-weight: 700; }
   .connect-link { display: flex; align-items: center; gap: .3rem; color: var(--muted); }
   .connect-link i { display: block; width: 18px; height: 0; border-top: 2px dotted color-mix(in oklab, var(--muted) 60%, transparent); }
@@ -90,7 +91,12 @@
   <main class="connect-page">
     <section class="connect-card" aria-labelledby="connectTitle">
       <div class="connect-pair" aria-hidden="true">
-        <span class="connect-mark is-app">{{ $initial }}</span>
+        {{-- Claude's own mark, unchanged, only when the app really is Claude (SignInWithListen::isClaude); else the app's first letter. --}}
+        @if($isClaude ?? false)
+          <span class="connect-mark is-app is-claude"><img src="{{ \App\Support\VersionedAsset::url('images/partners/claude-mark.svg') }}" alt="" width="34" height="34"></span>
+        @else
+          <span class="connect-mark is-app">{{ $initial }}</span>
+        @endif
         <span class="connect-link"><i></i><svg viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.66 0l3-3a4 4 0 0 0-5.66-5.66l-1 1M14 10a4 4 0 0 0-5.66 0l-3 3a4 4 0 0 0 5.66 5.66l1-1"/></svg><i></i></span>
         <span class="connect-mark is-listen"><svg viewBox="0 0 128 128"><rect x="18" y="59" width="8" height="10" rx="4" fill="#fff"/><rect x="32" y="46" width="8" height="36" rx="4" fill="#fff"/><rect x="46" y="35" width="8" height="58" rx="4" fill="#fff"/><rect x="60" y="24" width="8" height="80" rx="4" fill="#fff"/><rect x="74" y="35" width="8" height="58" rx="4" fill="#fff"/><rect x="88" y="46" width="8" height="36" rx="4" fill="#fff"/><rect x="102" y="59" width="8" height="10" rx="4" fill="#fff"/></svg></span>
       </div>

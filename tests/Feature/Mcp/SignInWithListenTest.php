@@ -184,6 +184,31 @@ class SignInWithListenTest extends TestCase
         $this->assertSame(1, ApiKey::query()->issued()->active()->count());
     }
 
+    /** Claude's own mark shows only when the access really goes to Claude; a name alone gets the app's letter. */
+    public function test_only_the_real_claude_gets_its_mark_on_the_allow_page(): void
+    {
+        $user = $this->member();
+        $page = function (string $name, string $redirect) use ($user): TestResponse {
+            $clientId = (string) $this->postJson('/oauth/register', ['client_name' => $name, 'redirect_uris' => [$redirect]])->assertCreated()->json('client_id');
+            $url = '/oauth/authorize?'.http_build_query(['response_type' => 'code', 'client_id' => $clientId, 'redirect_uri' => $redirect,
+                'code_challenge' => $this->challenge('v'), 'code_challenge_method' => 'S256', 'state' => 's', 'scope' => 'mcp:use', 'resource' => url('/mcp')]);
+
+            return $this->actingAs($user)->get($url)->assertOk();
+        };
+
+        $page('Claude', 'https://claude.ai/api/mcp/auth_callback')->assertSee('images/partners/claude-mark.svg', false);
+        $page('Claude Code (listen)', 'http://localhost:3118/callback')->assertSee('images/partners/claude-mark.svg', false);
+        // Another app calling itself Claude, or one on the computer with another name: its first letter.
+        $page('Claude', 'https://claude.example.com/callback')->assertDontSee('claude-mark.svg', false);
+        $page('Claude Code', 'https://example.com/callback')->assertDontSee('claude-mark.svg', false);
+        $page('Some tool', 'http://localhost:3118/callback')->assertDontSee('claude-mark.svg', false);
+
+        // Claude's file as Claude publishes it: its own colour, nothing redrawn.
+        $svg = (string) file_get_contents(public_path('images/partners/claude-mark.svg'));
+        $this->assertStringContainsString('fill="#D97757"', $svg);
+        $this->assertStringStartsWith('b150888bc7257af8', hash('sha256', $svg));
+    }
+
     private function member(): User
     {
         return $this->apiMember($this->plan);
