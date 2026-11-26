@@ -351,7 +351,8 @@ class AuthController extends Controller
         } else {
             $user->update([
                 'google_id' => $user->google_id ?: $googleId,
-                'google_avatar' => is_string($avatar) ? $avatar : $user->google_avatar,
+                // A new picture the column cannot hold keeps the one the member has.
+                'google_avatar' => User::avatarThatFits($avatar) ?? $user->google_avatar,
                 'email_verified_at' => $user->email_verified_at ?? now(),
             ]);
             $justCreated = false;
