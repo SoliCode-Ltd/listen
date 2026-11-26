@@ -53,7 +53,7 @@ class HomeReachTest extends TestCase
     {
         $this->members(['EG' => 12, 'SA' => 4, 'US' => 2, 'DE' => 1, 'FR' => 1]);
         // 9,483 members as the page would count them, without making 9,483 rows.
-        cache()->put('member_reach:v1', ['members' => 9483, 'countries' => MemberReach::counts()['countries']], 60);
+        cache()->put(MemberReach::CACHE_KEY, ['members' => 9483, 'countries' => MemberReach::counts()['countries']], 60);
         $this->assertSame(9000, MemberReach::membersRoundedDown());
 
         app()->setLocale('en');
@@ -82,6 +82,21 @@ class HomeReachTest extends TestCase
         [$lat, $lon] = $lit['FR']['at'];
         $this->assertEqualsWithDelta(46.6, $lat, 1.0);
         $this->assertEqualsWithDelta(2.4, $lon, 1.0);
+    }
+
+    public function test_new_members_show_within_the_hour(): void
+    {
+        $this->members(['EG' => 60, 'SA' => 30, 'US' => 10]);
+        $this->assertSame(100, MemberReach::counts()['members']);
+        $this->assertSame(3, MemberReach::countryCount());
+
+        // New members in a new country: still the earlier count a little later, the new one after the hour.
+        $this->members(['DE' => 5]);
+        $this->travel(30)->minutes();
+        $this->assertSame(100, MemberReach::counts()['members']);
+        $this->travel(31)->minutes();
+        $this->assertSame(105, MemberReach::counts()['members']);
+        $this->assertSame(4, MemberReach::countryCount());
     }
 
     public function test_israel_is_not_lit_or_named_on_the_globe(): void

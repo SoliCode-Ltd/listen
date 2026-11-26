@@ -8,11 +8,15 @@ use Illuminate\Support\Facades\DB;
 /**
  * Where Listen's members are, for the homepage's reach section: how many members, how many
  * countries they are in (users.country_code, kept at sign-up), and how strongly to light each
- * country on the map. Counts only, cached for a few hours; admin accounts are left out.
+ * country on the map. Counts only, cached for an hour; admin accounts are left out.
  */
 final class MemberReach
 {
-    private const CACHE_KEY = 'member_reach:v1';
+    /** A new key starts every server from a fresh count the moment it is deployed. */
+    public const CACHE_KEY = 'member_reach:v2';
+
+    /** How long a count is kept: a new country or the next thousand members shows within the hour. */
+    public const FRESH_MINUTES = 60;
 
     /** Below this, the section is not shown (a new install, a test database). */
     public const MIN_MEMBERS = 100;
@@ -30,7 +34,7 @@ final class MemberReach
      */
     public static function counts(): array
     {
-        return Cache::remember(self::CACHE_KEY, now()->addHours(6), function (): array {
+        return Cache::remember(self::CACHE_KEY, now()->addMinutes(self::FRESH_MINUTES), function (): array {
             $members = DB::table('users')->where(fn ($q) => $q->where('is_admin', false)->orWhereNull('is_admin'));
             $byCountry = (clone $members)
                 ->whereNotNull('country_code')->where('country_code', '!=', '')
