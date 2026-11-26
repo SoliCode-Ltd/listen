@@ -174,6 +174,11 @@
     /* A second part of a section (the steps for one app, the tools): its own row under the first, a line between. */
     .docs-subrow { margin-top: 2.5rem; padding-top: 2.25rem; border-top: 1px solid var(--line); }
     .docs-subrow > .docs-text > h4:first-child, .docs-subrow > h4:first-child { margin-top: 0; font-size: 1.22rem; }
+    /* A part within a section's part: a smaller heading, and a row that follows without a line. */
+    .docs-sub { margin: 1.75rem 0 .7rem; font-size: 1rem; font-weight: 650; color: var(--text); letter-spacing: 0; }
+    .docs-follows { margin-top: 1.9rem; }
+    .docs-follows .docs-sub { margin-top: 0; }
+    .docs-follows .docs-code { position: static; }
     /* The name of a button or menu in another app's own screen. */
     .docs-ui { font-weight: 620; color: var(--text); white-space: nowrap; }
     .docs-ui-as { font-size: .86em; color: var(--muted); white-space: nowrap; unicode-bidi: isolate; }
@@ -186,7 +191,7 @@
     .docs-section li { margin: .4rem 0; }
     .docs-section a:not(.docs-btn):not(.docs-flag), .docs-resource > p a { color: var(--text); text-decoration-color: color-mix(in oklab, var(--violet) 55%, transparent); text-underline-offset: 3px; }
     .docs-anchor { margin-inline-start: .45rem; color: var(--muted) !important; text-decoration: none !important; opacity: 0; font-weight: 400; transition: opacity .15s ease; }
-    :is(h3, h4):hover > .docs-anchor, .docs-anchor:focus-visible { opacity: 1; }
+    :is(h3, h4, h5):hover > .docs-anchor, .docs-anchor:focus-visible { opacity: 1; }
 
     .docs-text code, .docs-table code, .docs-index code, .docs-resource code {
       font-size: .86em; padding: .1rem .38rem; border-radius: 6px; white-space: nowrap;

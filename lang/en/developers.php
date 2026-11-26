@@ -236,7 +236,8 @@ return [
             // Claude, named here by the owner's choice (CLAUDE.md): the steps to connect Listen in it.
             'claude' => [
                 'title' => 'Connect in Claude',
-                'body' => 'Claude connects by signing in with Listen, on the web and in the desktop app. It works on every Claude plan; the free plan takes one custom connector.',
+                'body' => 'Claude connects by signing in with Listen. It works on every Claude plan; the free plan takes one custom connector.',
+                'web_title' => 'On the web and in the desktop app',
                 'steps' => [
                     'In Claude, open **Customize**, then **Connectors**. Click **+ Add**, then **Add custom connector**.',
                     'Name it **Listen**, paste `:url` as the address and click **Continue**.',
@@ -245,7 +246,7 @@ return [
                     'In a chat, click **+** at the bottom left, then **Connectors**, and check that Listen is on. Then ask for what you need.',
                 ],
                 'team' => 'In a Team or Enterprise workspace, an owner adds Listen first (steps 1 to 3). Each member then clicks **Connect** and signs in with their own Listen account.',
-                'code_title' => 'Connect in Claude Code',
+                'code_title' => 'In Claude Code',
                 'code_body' => 'Run the first command in your terminal. Then type `/mcp` in Claude Code, choose `listen`, and sign in with Listen in the browser that opens. On a plan with the developer API, the second command connects with an API key instead.',
                 'code_label' => 'Terminal',
                 'trouble_title' => 'If something does not work',
