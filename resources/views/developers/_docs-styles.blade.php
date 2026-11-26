@@ -71,7 +71,8 @@
     .docs-bar-current { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-weight: 500; text-align: start; }
     .docs-bar-current:not(:empty)::before { content: "/"; margin-inline-end: .55rem; color: var(--line); }
     .docs-bar-chevron { color: var(--muted); }
-    .docs-sheet { position: fixed; inset: 0; z-index: 90; display: flex; background: rgba(10, 8, 24, .5); }
+    /* Over everything while open: the site's top bar (100) and its menu (130) included. */
+    .docs-sheet { position: fixed; inset: 0; z-index: 140; display: flex; background: rgba(10, 8, 24, .5); }
     .docs-sheet[hidden] { display: none; }
     .docs-sheet-card { display: flex; flex-direction: column; width: min(380px, 90vw); height: 100%; background: var(--bg); border-inline-end: 1px solid var(--line); box-shadow: 0 0 60px -10px rgba(0, 0, 0, .45); animation: docs-sheet-in .22s cubic-bezier(.2, .7, .2, 1) both; }
     .docs-sheet-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .9rem .75rem .5rem 1.1rem; font-size: 1.02rem; font-weight: 700; color: var(--text); }
@@ -84,6 +85,8 @@
     .docs-sheet .docs-nav a { padding-block: .5rem; font-size: .95rem; }
     .docs-sheet .docs-nav .docs-nav-endpoint { font-size: .92rem; }
     html.docs-sheet-open, html.docs-sheet-open body { overflow: hidden; }
+    /* The floating WhatsApp and call buttons step aside while the contents are open. */
+    html.docs-sheet-open :is(.wa-widget, .lva) { visibility: hidden; }
     @keyframes docs-sheet-in { from { opacity: 0; transform: translateX(-18px); } to { opacity: 1; transform: none; } }
     html[dir="rtl"] .docs-sheet-card { animation-name: docs-sheet-in-rtl; }
     @keyframes docs-sheet-in-rtl { from { opacity: 0; transform: translateX(18px); } to { opacity: 1; transform: none; } }
