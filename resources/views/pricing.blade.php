@@ -1638,7 +1638,7 @@
       var isYearly = false;
       var i18n = @json($pricingI18n);
 
-      // A price inside an Arabic sentence keeps its own order ("3.20 US$", never "$US 3.20").
+      // A price inside an Arabic sentence keeps its own order ("$3.20" or "15 ر.س.", never "3.20$").
       function ltr(text) { return '\u2066' + text + '\u2069'; }
 
       function updatePrices() {
@@ -1914,7 +1914,7 @@
         document.getElementById('planBarName').textContent = name ? name.textContent.trim() : '';
         barPrice.textContent = '';
         if (price) {
-          // The price in its own direction ("15.40 US$", never "$US 15.40"), "/month" after it.
+          // The price in its own direction ("$15.40", never "15.40$"), "/month" after it.
           var now = document.createElement('span');
           var amount = document.createElement('span');
           now.className = 'plan-bar-now';

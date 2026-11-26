@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Plan;
+use App\Models\SiteSetting;
 use App\Services\LocalizedPricingService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
@@ -29,12 +30,12 @@ class LocalizedPricingServiceTest extends TestCase
 
     public function test_country_context_falls_back_to_configured_market(): void
     {
-        \App\Models\SiteSetting::set('pricing_fallback_country_code', 'US', 'billing');
-        \App\Models\SiteSetting::set('pricing_fallback_currency_code', 'USD', 'billing');
-        \App\Models\SiteSetting::set('pricing_ip_lookup_enabled', '0', 'billing');
+        SiteSetting::set('pricing_fallback_country_code', 'US', 'billing');
+        SiteSetting::set('pricing_fallback_currency_code', 'USD', 'billing');
+        SiteSetting::set('pricing_ip_lookup_enabled', '0', 'billing');
         // Also the server-public-IP lookup, which otherwise geolocates the machine running the tests.
-        \App\Models\SiteSetting::set('pricing_public_ip_lookup_enabled', '0', 'billing');
-        \App\Models\SiteSetting::set('pricing_accept_language_enabled', '0', 'billing');
+        SiteSetting::set('pricing_public_ip_lookup_enabled', '0', 'billing');
+        SiteSetting::set('pricing_accept_language_enabled', '0', 'billing');
 
         $service = app(LocalizedPricingService::class);
         $request = Request::create('https://example.com/billing', 'GET', [], [], [], [
@@ -50,8 +51,8 @@ class LocalizedPricingServiceTest extends TestCase
 
     public function test_localhost_uses_local_override_market(): void
     {
-        \App\Models\SiteSetting::set('pricing_local_country_code', 'EG', 'billing');
-        \App\Models\SiteSetting::set('pricing_local_currency_code', 'EGP', 'billing');
+        SiteSetting::set('pricing_local_country_code', 'EG', 'billing');
+        SiteSetting::set('pricing_local_currency_code', 'EGP', 'billing');
 
         $service = app(LocalizedPricingService::class);
         $request = Request::create('http://localhost/billing', 'GET');
@@ -66,8 +67,8 @@ class LocalizedPricingServiceTest extends TestCase
 
     public function test_localhost_ignores_header_noise_and_keeps_local_override_market(): void
     {
-        \App\Models\SiteSetting::set('pricing_local_country_code', 'EG', 'billing');
-        \App\Models\SiteSetting::set('pricing_local_currency_code', 'EGP', 'billing');
+        SiteSetting::set('pricing_local_country_code', 'EG', 'billing');
+        SiteSetting::set('pricing_local_currency_code', 'EGP', 'billing');
 
         $service = app(LocalizedPricingService::class);
         $request = Request::create('http://localhost/billing', 'GET', [], [], [], [
@@ -103,9 +104,9 @@ class LocalizedPricingServiceTest extends TestCase
 
     public function test_egypt_manual_quote_uses_automatic_exchange_rate_conversion(): void
     {
-        \App\Models\SiteSetting::set('manual_instapay_enabled', '1', 'billing');
-        \App\Models\SiteSetting::set('manual_instapay_number', '0123456789', 'billing');
-        \App\Models\SiteSetting::set('pricing_exchange_rate_EGP', '52.35', 'billing');
+        SiteSetting::set('manual_instapay_enabled', '1', 'billing');
+        SiteSetting::set('manual_instapay_number', '0123456789', 'billing');
+        SiteSetting::set('pricing_exchange_rate_EGP', '52.35', 'billing');
 
         $plan = Plan::query()->create([
             'slug' => 'starter',
@@ -134,7 +135,7 @@ class LocalizedPricingServiceTest extends TestCase
 
     public function test_converted_quote_uses_auto_currency_with_exchange_rate_override(): void
     {
-        \App\Models\SiteSetting::set('pricing_exchange_rate_GBP', '0.8', 'billing');
+        SiteSetting::set('pricing_exchange_rate_GBP', '0.8', 'billing');
 
         $service = app(LocalizedPricingService::class);
         $quote = $service->convertedQuoteFromUsd(900, 'monthly', [
@@ -158,5 +159,70 @@ class LocalizedPricingServiceTest extends TestCase
 
         $this->assertMatchesRegularExpression('/[0-9]/', $formatted);
         $this->assertDoesNotMatchRegularExpression('/[٠-٩۰-۹]/u', $formatted);
+    }
+
+    /**
+     * A country the service has no line for gets the currency PHP itself knows for it,
+     * with no request to an outside service (the one once asked has retired).
+     */
+    public function test_a_country_without_its_own_line_gets_its_currency_without_asking_outside(): void
+    {
+        Http::fake();
+        $service = app(LocalizedPricingService::class);
+
+        foreach (['FI' => 'EUR', 'GR' => 'EUR', 'MR' => 'MRU', 'PS' => 'ILS', 'SO' => 'SOS'] as $country => $currency) {
+            $context = $service->resolveCountryContext(Request::create('https://example.com/pricing', 'GET', [], [], [], [
+                'REMOTE_ADDR' => '203.0.113.10',
+                'HTTP_CF_IPCOUNTRY' => $country,
+            ]));
+            $this->assertSame($currency, $context['currency'], $country);
+        }
+
+        Http::assertNothingSent();
+    }
+
+    /**
+     * Yemen, Syria and Sudan are priced in dollars on purpose: their money trades far from
+     * the official rate, and the card is charged in dollars anyway.
+     */
+    public function test_yemen_syria_and_sudan_are_priced_in_dollars(): void
+    {
+        Http::fake();
+        SiteSetting::set('pricing_exchange_rate_YER', '236', 'billing');
+        $service = app(LocalizedPricingService::class);
+
+        foreach (['YE', 'SY', 'SD'] as $country) {
+            $context = $service->resolveCountryContext(Request::create('https://example.com/pricing', 'GET', [], [], [], [
+                'REMOTE_ADDR' => '203.0.113.10',
+                'HTTP_CF_IPCOUNTRY' => $country,
+            ]));
+            $this->assertSame('USD', $context['currency'], $country);
+
+            $quote = $service->convertedQuoteFromUsd(400, 'monthly', $context, 'stripe', 'ar');
+            $this->assertSame('USD', $quote['currency'], $country);
+            $this->assertSame(400, $quote['amount_minor'], $country);
+            $this->assertFalse($quote['is_converted'], $country);
+        }
+
+        Http::assertNothingSent();
+    }
+
+    /**
+     * Dollars read the same on the Arabic pages as on the English ones: "$4", not "4 US$".
+     * Other currencies keep their Arabic form.
+     */
+    public function test_dollars_are_written_with_the_dollar_sign_first_in_arabic(): void
+    {
+        $service = app(LocalizedPricingService::class);
+
+        $this->assertSame('$4.00', $service->formatAmount(400, 'USD', 'ar'));
+        $this->assertSame('$4.00', $service->formatAmount(400, 'USD', 'en'));
+        $this->assertSame('$19.80', $service->formatAmount(1980, 'USD', 'ar'));
+        $this->assertSame('$5', $service->formatWholeAmount(450, 'USD', 'ar'));
+        $this->assertStringNotContainsString('US$', $service->formatAmount(1234500, 'USD', 'ar'));
+
+        $riyals = $service->formatAmount(1500, 'SAR', 'ar');
+        $this->assertStringContainsString('ر.س', $riyals);
+        $this->assertStringContainsString('15.00', $riyals);
     }
 }
