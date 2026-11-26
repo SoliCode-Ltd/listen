@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Plan;
 use App\Models\SiteSetting;
+use App\Support\CurrencySymbols;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -75,7 +76,8 @@ class LocalizedPricingService
         'CZ' => 'CZK',
         'HU' => 'HUF',
         'RO' => 'RON',
-        'BG' => 'BGN',
+        // Bulgaria has used the euro since 1 January 2026.
+        'BG' => 'EUR',
         'RU' => 'RUB',
         'UA' => 'UAH',
         'IN' => 'INR',
@@ -375,18 +377,9 @@ class LocalizedPricingService
     {
         $locale = strtolower(trim((string) ($locale ?: app()->getLocale())));
         $whole = (int) ceil(max(0, $amountMinor) / 100);
-        $formatterLocale = $this->formatterLocale($locale, $currency);
 
-        if (class_exists(NumberFormatter::class)) {
-            $formatter = new NumberFormatter($formatterLocale, NumberFormatter::CURRENCY);
-            $formatter->setAttribute(NumberFormatter::FRACTION_DIGITS, 0);
-            $formatted = $formatter->formatCurrency($whole, strtoupper($currency));
-            if (is_string($formatted) && trim($formatted) !== '') {
-                return $this->normalizeToLatinDigits(trim($formatted));
-            }
-        }
-
-        return $this->normalizeToLatinDigits(strtoupper($currency).' '.number_format($whole));
+        return $this->formatMoney($whole, $currency, $locale, 0)
+            ?? $this->normalizeToLatinDigits(strtoupper($currency).' '.number_format($whole));
     }
 
     /**
@@ -403,28 +396,48 @@ class LocalizedPricingService
         return $currency === self::CURRENCY_EGP ? 'ar_EG@numbers=latn' : 'ar@numbers=latn';
     }
 
+    /**
+     * A price written in the page's language: with the currency's own symbol where the library
+     * would write its code (App\Support\CurrencySymbols: "₺15.00", "15.00 ₺" in Arabic), else in
+     * the library's own form. Null when the library is missing or writes nothing.
+     */
+    private function formatMoney(float|int $amount, string $currency, string $locale, ?int $fractionDigits): ?string
+    {
+        if (! class_exists(NumberFormatter::class)) {
+            return null;
+        }
+        $currency = strtoupper($currency);
+        $formatterLocale = $this->formatterLocale($locale, $currency);
+        $symbol = CurrencySymbols::for($currency);
+
+        if ($symbol === null) {
+            $formatter = new NumberFormatter($formatterLocale, NumberFormatter::CURRENCY);
+            if ($fractionDigits !== null) {
+                $formatter->setAttribute(NumberFormatter::FRACTION_DIGITS, $fractionDigits);
+            }
+            $formatted = $formatter->formatCurrency($amount, $currency);
+        } else {
+            // The currency named in the locale gives its own decimals (none for the shilling);
+            // the symbol replaces the code the library would write.
+            $formatter = new NumberFormatter($formatterLocale.(str_contains($formatterLocale, '@') ? ';' : '@').'currency='.$currency, NumberFormatter::CURRENCY);
+            $formatter->setSymbol(NumberFormatter::CURRENCY_SYMBOL, $symbol);
+            if ($fractionDigits !== null) {
+                $formatter->setAttribute(NumberFormatter::FRACTION_DIGITS, $fractionDigits);
+            }
+            $formatted = $formatter->format($amount);
+        }
+
+        return is_string($formatted) && trim($formatted) !== '' ? $this->normalizeToLatinDigits(trim($formatted)) : null;
+    }
+
     public function formatAmount(int $amountMinor, string $currency, ?string $locale = null): string
     {
         $locale = strtolower(trim((string) ($locale ?: app()->getLocale())));
-        $formatterLocale = $this->formatterLocale($locale, $currency);
-
         $isEgp = strtoupper($currency) === self::CURRENCY_EGP;
         $amount = $amountMinor / 100;
 
-        if (class_exists(NumberFormatter::class)) {
-            $formatter = new NumberFormatter($formatterLocale, NumberFormatter::CURRENCY);
-            if ($isEgp) {
-                $formatter->setAttribute(NumberFormatter::FRACTION_DIGITS, 0);
-            }
-            $formatted = $formatter->formatCurrency($amount, strtoupper($currency));
-            if (is_string($formatted) && trim($formatted) !== '') {
-                return $this->normalizeToLatinDigits(trim($formatted));
-            }
-        }
-
-        $decimals = $isEgp ? 0 : 2;
-
-        return $this->normalizeToLatinDigits(strtoupper($currency).' '.number_format($amount, $decimals));
+        return $this->formatMoney($amount, $currency, $locale, $isEgp ? 0 : null)
+            ?? $this->normalizeToLatinDigits(strtoupper($currency).' '.number_format($amount, $isEgp ? 0 : 2));
     }
 
     /**

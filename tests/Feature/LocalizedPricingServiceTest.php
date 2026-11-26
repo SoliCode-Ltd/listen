@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Plan;
 use App\Models\SiteSetting;
 use App\Services\LocalizedPricingService;
+use App\Support\CurrencySymbols;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
@@ -224,5 +225,83 @@ class LocalizedPricingServiceTest extends TestCase
         $riyals = $service->formatAmount(1500, 'SAR', 'ar');
         $this->assertStringContainsString('ر.س', $riyals);
         $this->assertStringContainsString('15.00', $riyals);
+    }
+
+    /**
+     * A currency the library would write as its code is written with its own country's
+     * symbol, in English before the number and in Arabic after it; the amount is the same.
+     */
+    public function test_currencies_are_written_with_their_own_symbol(): void
+    {
+        $service = app(LocalizedPricingService::class);
+        // The library keeps number and symbol together with a no-break space, and marks
+        // Arabic prices right to left; compared here as plain text.
+        $plain = fn (string $text): string => str_replace(["\u{200F}", "\u{00A0}"], ['', ' '], $text);
+
+        $this->assertMatchesRegularExpression('/^₺15(\.00)?$/u', $plain($service->formatAmount(1500, 'TRY', 'en')));
+        $this->assertMatchesRegularExpression('/^15(\.00)?\ ₺$/u', $plain($service->formatAmount(1500, 'TRY', 'ar')));
+        // Whether the rupee is written with paisa depends on the formatting library's version.
+        $this->assertMatchesRegularExpression('/^Rs 1,106(\.00)?$/', $plain($service->formatAmount(110600, 'PKR', 'en')));
+        $this->assertMatchesRegularExpression('/^Ksh\ 15(\.00)?$/u', $plain($service->formatAmount(1500, 'KES', 'en')));
+        $this->assertMatchesRegularExpression('/^₦5,920(\.00)?$/u', $plain($service->formatAmount(592000, 'NGN', 'en')));
+        $this->assertMatchesRegularExpression('/^R\ 73(\.10)?$/u', $plain($service->formatAmount(7310, 'ZAR', 'en')));
+        // The shilling has no cents: none are written.
+        $this->assertMatchesRegularExpression('/^USh\ 16,343$/u', $plain($service->formatAmount(1634337, 'UGX', 'en')));
+        $this->assertMatchesRegularExpression('/^₺16$/u', $plain($service->formatWholeAmount(1550, 'TRY', 'en')));
+        $this->assertMatchesRegularExpression('/^₱15(\.00)?$/u', $plain($service->formatAmount(1500, 'PHP', 'en')));
+        $this->assertMatchesRegularExpression('/^15(\.00)?\ ₱$/u', $plain($service->formatAmount(1500, 'PHP', 'ar')));
+    }
+
+    /**
+     * Every symbol on the list is used, in both languages, instead of the code, and the
+     * written price is still the amount.
+     */
+    public function test_every_listed_symbol_replaces_the_code_and_keeps_the_amount(): void
+    {
+        $service = app(LocalizedPricingService::class);
+
+        foreach (CurrencySymbols::all() as $currency => $symbol) {
+            foreach (['en', 'ar'] as $locale) {
+                $written = $service->formatAmount(123456, $currency, $locale);
+                $this->assertStringContainsString($symbol, $written, "{$currency} {$locale}");
+                if (! str_contains($symbol, $currency)) {
+                    $this->assertStringNotContainsString($currency, $written, "{$currency} {$locale}");
+                }
+                $this->assertSame(1, preg_match('/\d[\d,]*(?:\.\d+)?/', $written, $number), "{$currency} {$locale}");
+                $this->assertEqualsWithDelta(1234.56, (float) str_replace(',', '', $number[0]), 1.0, "{$currency} {$locale}: {$written}");
+            }
+        }
+    }
+
+    /**
+     * Arab currencies stay as they were: Arabic letters on the Arabic pages, the code on the
+     * English ones. A peso whose own sign is "$" keeps its code, so it never reads as dollars.
+     */
+    public function test_arab_currencies_and_dollar_sign_pesos_keep_their_form(): void
+    {
+        $service = app(LocalizedPricingService::class);
+        $plain = fn (string $text): string => str_replace(["\u{200F}", "\u{00A0}"], ['', ' '], $text);
+
+        $this->assertMatchesRegularExpression('/^SAR\ 15(\.00)?$/u', $plain($service->formatAmount(1500, 'SAR', 'en')));
+        $this->assertStringContainsString('ر.س', $service->formatAmount(1500, 'SAR', 'ar'));
+        $this->assertMatchesRegularExpression('/^AED\ 15(\.00)?$/u', $plain($service->formatAmount(1500, 'AED', 'en')));
+        $this->assertStringContainsString('د.ك', $service->formatAmount(1500, 'KWD', 'ar'));
+        $this->assertMatchesRegularExpression('/^ARS\ 15(\.00)?$/u', $plain($service->formatAmount(1500, 'ARS', 'en')));
+        // Whether the peso is written with centavos depends on the formatting library's version.
+        $this->assertMatchesRegularExpression('/^COP 15(\.00)?$/', $plain($service->formatAmount(1500, 'COP', 'en')));
+        $this->assertMatchesRegularExpression('/^€15(\.00)?$/u', $plain($service->formatAmount(1500, 'EUR', 'en')));
+        $this->assertMatchesRegularExpression('/^\$15(\.00)?$/u', $plain($service->formatAmount(1500, 'USD', 'ar')));
+    }
+
+    /** Bulgaria has used the euro since 1 January 2026. */
+    public function test_bulgaria_is_priced_in_euros(): void
+    {
+        Http::fake();
+        $context = app(LocalizedPricingService::class)->resolveCountryContext(Request::create('https://example.com/pricing', 'GET', [], [], [], [
+            'REMOTE_ADDR' => '203.0.113.10',
+            'HTTP_CF_IPCOUNTRY' => 'BG',
+        ]));
+
+        $this->assertSame('EUR', $context['currency']);
     }
 }
