@@ -246,13 +246,47 @@ class McpServerTest extends TestCase
     }
 
     /**
+     * A short text is made in the request itself, as the studio makes it: it never
+     * waits for the queue's next start (on the servers, up to a minute away).
+     */
+    public function test_a_short_text_is_made_at_once_without_waiting_for_the_queue(): void
+    {
+        // A queue nobody is working: anything put on it would stay "queued".
+        config(['queue.default' => 'database', 'listen.mcp.wait_seconds' => 0]);
+        $user = $this->member();
+        $plain = $this->issueKey($user)['plain'];
+        $voice = self::voiceId($this->premiumVoice());
+
+        $this->callTool($plain, 'text_to_speech', ['text' => 'Hello there, this is a test.', 'voice_id' => $voice])
+            ->assertJsonPath('result.isError', false)
+            ->assertJsonPath('result.structuredContent.status', 'completed')
+            ->assertJsonPath('result.content.1.type', 'resource_link');
+        $this->assertSame(0, \Illuminate\Support\Facades\DB::table('jobs')->count());
+        $this->assertSame(Credits::forSeconds($this->audioSeconds), $this->creditsSpent($user));
+        $this->assertSame(GenerationSource::MCP, AudioGeneration::query()->sole()->textItem->source_type);
+
+        // A text longer than that goes on the queue, and comes back with its history item to check.
+        config(['listen.mcp.now_characters' => 20]);
+        $this->callTool($plain, 'text_to_speech', ['text' => 'This one is a little longer than twenty characters.', 'voice_id' => $voice])
+            ->assertJsonPath('result.isError', false)
+            ->assertJsonPath('result.structuredContent.status', 'queued');
+        $this->assertSame(1, \Illuminate\Support\Facades\DB::table('jobs')->count());
+
+        // With every waiting place taken, a short text goes on the queue too, instead of holding another web worker.
+        config(['listen.mcp.now_characters' => 1500, 'listen.mcp.waiting_slots' => 0]);
+        $this->callTool($plain, 'text_to_speech', ['text' => 'Hello once more.', 'voice_id' => $voice])
+            ->assertJsonPath('result.structuredContent.status', 'queued');
+    }
+
+    /**
      * Speech still on the queue when the wait is over comes back with its
      * history item (reserved, not lost), and get_speech brings the link once
      * it is done.
      */
     public function test_speech_not_ready_in_time_comes_back_with_its_history_item(): void
     {
-        config(['queue.default' => 'database', 'listen.mcp.wait_seconds' => 0]);
+        // A text too long to make in the request goes on the queue (here: every text).
+        config(['queue.default' => 'database', 'listen.mcp.wait_seconds' => 0, 'listen.mcp.now_characters' => 0]);
         $user = $this->member();
         $plain = $this->issueKey($user)['plain'];
 

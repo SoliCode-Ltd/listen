@@ -173,6 +173,10 @@ return [
         // waits this long for it before answering with its history item instead: well
         // inside the minute AI apps usually give a tool.
         'wait_seconds' => (int) env('LISTEN_MCP_WAIT_SECONDS', 40),
+        // A text up to this many characters is made in the request itself, as the studio
+        // makes it (a few seconds), instead of waiting for the queue's next start. Longer
+        // texts take longer than an AI app waits and go on the queue. 0: always the queue.
+        'now_characters' => (int) env('LISTEN_MCP_NOW_CHARACTERS', 1500),
         // Such waits at once, for the whole site: each holds a web worker. When all are
         // in use, the tool answers at once with the history item to check later.
         'waiting_slots' => (int) env('LISTEN_MCP_WAITING_SLOTS', 4),
