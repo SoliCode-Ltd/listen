@@ -81,7 +81,7 @@ class ListenServer extends Server
 
             To make speech:
             1. Call list_voices (filter by language and gender) and choose a voice. Its language must match the text. Every voice speaks any dialect or accent of its language, so do not search voices by dialect.
-            2. If the person wants a dialect, accent, style or emotion, find its code with get_voice_options.
+            2. If the person wants a dialect, accent, style, emotion or sound environment (a hall, a phone call, an old radio), find its code with get_voice_options. It also lists the file types the plan includes.
             3. Call text_to_speech with the text exactly as it should be spoken. It returns a link the person can play or download, for as many days as their plan keeps audio history: give them the link.
             4. A long text may still be in progress: call get_speech with its history_item_id until it is completed.
 

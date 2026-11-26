@@ -2,6 +2,9 @@
 
 namespace Tests\Feature\Mcp;
 
+use App\Models\Pronunciation;
+use App\Support\AudioEffects;
+use App\Support\Pronunciations;
 use App\Filament\Resources\AudioGenerationResource;
 use App\Filament\Resources\AudioGenerationResource\Pages\ListAudioGenerations;
 use App\Jobs\GenerateAudioJob;
@@ -150,6 +153,96 @@ class McpServerTest extends TestCase
         $logged = ApiRequestLog::query()->where('endpoint', 'mcp.text_to_speech')->sole();
         $this->assertSame([(int) $generation->id, $credits, 200], [$logged->history_item_id, $logged->credits, $logged->status]);
         $this->assertSame((int) $key->id, (int) $logged->api_key_id);
+    }
+
+    /** The studio's own options reach speech an assistant makes: speed, pitch, a sound environment, translation and the file type. */
+    public function test_the_studios_options_reach_speech_made_by_an_assistant(): void
+    {
+        $user = $this->apiMember($this->apiPlan(['slug' => 'studio', 'sound_effects_enabled' => true, 'download_formats' => ['mp3', 'wav']]));
+        $plain = $this->issueKey($user)['plain'];
+        $voice = $this->premiumVoice();
+        // A sound environment needs the server's audio tools, as on the site.
+        $effect = AudioEffects::available() ? ['audio_effect' => 'hall'] : [];
+
+        $result = $this->callTool($plain, 'text_to_speech', ['text' => 'Hello there, this is a test.', 'voice_id' => self::voiceId($voice),
+            'speed' => 1.2, 'pitch' => 3, 'output_format' => 'wav'] + $effect)
+            ->assertOk()->assertJsonPath('result.isError', false)->json('result');
+
+        $generation = AudioGeneration::query()->sole();
+        $this->assertSame([1.2, 3.0], [(float) $generation->speed, (float) $generation->pitch]);
+        if ($effect !== []) {
+            $this->assertSame('hall', $result['structuredContent']['audio_effect']);
+        }
+        // The link is for the file type asked for, and only that link: the type is part of what is signed.
+        $link = $result['structuredContent']['audio_url'];
+        $this->assertStringContainsString('format=wav', $link);
+        $this->assertSame('listen-'.$generation->id.'.wav', $result['content'][1]['name']);
+        $this->assertSame('audio/wav', $result['content'][1]['mimeType']);
+        $this->get($link)->assertOk();
+        $this->get(str_replace('format=wav', 'format=flac', $link))->assertForbidden();
+
+        // get_speech gives the same recording in a type the plan includes, and refuses one it does not.
+        $again = $this->callTool($plain, 'get_speech', ['history_item_id' => $generation->id, 'output_format' => 'wav'])->assertJsonPath('result.isError', false)->json('result');
+        $this->assertStringContainsString('format=wav', $again['structuredContent']['audio_url']);
+        $refused = $this->callTool($plain, 'get_speech', ['history_item_id' => $generation->id, 'output_format' => 'flac'])->assertJsonPath('result.isError', true)->json('result.content.0.text');
+        $this->assertStringContainsString('feature_not_in_plan', $refused);
+
+        // The options tool says what can be asked for.
+        $options = $this->callTool($plain, 'get_voice_options')->json('result.content.0.text');
+        $this->assertStringContainsString('Pitch: -10 to 10 (default 0).', $options);
+        $this->assertStringContainsString('Sound environments (audio_effect): ', $options);
+        $this->assertStringContainsString('File types (output_format): mp3', $options);
+
+        // A sound environment that does not exist is the API's own clear error, and nothing is made or charged.
+        $unknown = $this->callTool($plain, 'text_to_speech', ['text' => 'Hello again.', 'voice_id' => self::voiceId($voice), 'audio_effect' => 'moon'])
+            ->assertJsonPath('result.isError', true)->json('result.content.0.text');
+        $this->assertStringContainsString('invalid_audio_effect', $unknown);
+        $this->assertSame(1, AudioGeneration::query()->count());
+    }
+
+    /** A file type the plan does not include is refused before anything is made, naming the plans that include it. */
+    public function test_a_file_type_outside_the_plan_is_refused_before_anything_is_made(): void
+    {
+        $plain = $this->issueKey($this->member())['plain'];
+
+        $refused = $this->callTool($plain, 'text_to_speech', ['text' => 'Hello there.', 'voice_id' => self::voiceId($this->premiumVoice()), 'output_format' => 'wav'])
+            ->assertJsonPath('result.isError', true)->json('result.content.0.text');
+
+        $this->assertStringContainsString('feature_not_in_plan', $refused);
+        $this->assertSame(0, AudioGeneration::query()->count());
+    }
+
+    /** The text is translated into the voice's language first when the assistant asks. */
+    public function test_an_assistant_can_have_the_text_translated_before_it_is_read(): void
+    {
+        $this->translatorUp = true;
+        $plain = $this->issueKey($this->member())['plain'];
+        $omar = $this->premiumVoice(['language' => 'ar', 'gender' => 'male', 'display_name' => 'Omar', 'internal_voice_id' => 'ar-Gemini-HD-Puck', 'provider_voice_id' => 'Puck']);
+
+        $this->callTool($plain, 'text_to_speech', ['text' => 'Welcome to this test.', 'voice_id' => self::voiceId($omar), 'translate' => true])
+            ->assertOk()->assertJsonPath('result.isError', false);
+
+        $generation = AudioGeneration::query()->sole();
+        $this->assertTrue((bool) $generation->translate);
+        $this->assertSame('done', $generation->status);
+    }
+
+    /** A member's saved pronunciations are used for speech an assistant makes, as in the studio. */
+    public function test_speech_made_by_an_assistant_reads_the_members_saved_pronunciations(): void
+    {
+        $user = $this->member();
+        $plain = $this->issueKey($user)['plain'];
+        // Switched on in Admin → TTS Settings ("Members' pronunciations").
+        SiteSetting::set(Pronunciations::SETTING, '1', 'tts');
+        Pronunciation::query()->create(['user_id' => $user->id, 'word' => 'Nguyen', 'word_key' => 'nguyen', 'spoken' => 'Win']);
+
+        $this->callTool($plain, 'text_to_speech', ['text' => 'Please welcome Nguyen to the show.', 'voice_id' => self::voiceId($this->premiumVoice())])
+            ->assertOk()->assertJsonPath('result.isError', false);
+
+        $generation = AudioGeneration::query()->sole();
+        // What the member wrote is kept and charged; what the voice read has their spelling.
+        $this->assertSame('Please welcome Nguyen to the show.', $generation->input_text);
+        $this->assertSame('Please welcome Win to the show.', $generation->settings_snapshot['spoken_text'] ?? null);
     }
 
     /**

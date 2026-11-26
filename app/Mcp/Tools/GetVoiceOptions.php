@@ -21,7 +21,7 @@ use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
  */
 #[Name('get_voice_options')]
 #[Title('Get voice options')]
-#[Description('List the codes text_to_speech accepts: Arabic dialects and English accents, delivery styles and emotions, with the defaults, the speed range, and the options this account\'s plan includes (such as dialogue between voices).')]
+#[Description('List the codes text_to_speech accepts: Arabic dialects and English accents, delivery styles, emotions and sound environments, with the defaults, the speed and pitch ranges, the file types, and the options this account\'s plan includes (such as dialogue between voices).')]
 #[IsReadOnly]
 #[IsIdempotent]
 #[IsOpenWorld(false)]
@@ -43,6 +43,9 @@ class GetVoiceOptions extends ListenTool
             'Styles: '.$codes((array) ($options['styles'] ?? [])),
             'Emotions: '.$codes((array) ($options['emotions'] ?? [])),
             'Speed: '.$options['voice_settings']['speed']['min'].' to '.$options['voice_settings']['speed']['max'].' (default '.$options['voice_settings']['speed']['default'].').',
+            'Pitch: '.$options['voice_settings']['pitch']['min'].' to '.$options['voice_settings']['pitch']['max'].' (default '.$options['voice_settings']['pitch']['default'].').',
+            ...(! empty($options['audio_effects']) ? ['Sound environments (audio_effect): '.$codes((array) $options['audio_effects'])] : []),
+            'File types (output_format): '.implode(', ', (array) ($options['output_formats'] ?? ['mp3'])).'.',
             'Defaults: Arabic '.implode(', ', array_filter((array) ($options['defaults']['ar'] ?? []))).'; English '.implode(', ', array_filter((array) ($options['defaults']['en'] ?? []))).'.',
             'On this plan: '.implode(', ', array_keys(array_filter((array) ($options['features'] ?? [])))).'.',
         ];
