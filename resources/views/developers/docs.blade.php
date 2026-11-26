@@ -237,17 +237,53 @@
               <li>{!! $t('mcp.step3') !!}</li>
             </ol>
             <p class="docs-note">{!! $t('mcp.note') !!}@if($speechToTextPublic) {!! $t('mcp.note_speech_to_text') !!}@endif</p>
-            <h4>{{ $plain('mcp.tools_title') }}</h4>
-            <p>{{ $plain('mcp.tools_body') }}</p>
-            <dl class="docs-params">
-              @foreach(\App\Mcp\Servers\ListenServer::toolNames() as $tool)
-                <div class="docs-param"><dt><code dir="ltr" class="docs-param-name">{{ $tool }}</code></dt><dd>{{ __('developers.docs.mcp.tools.'.($tool === 'get_account' && $speechToTextPublic ? 'get_account_speech_to_text' : $tool)) }}</dd></div>
-              @endforeach
-            </dl>
           </div>
           <div class="docs-code">
             @include('developers._docs-code', ['label' => $plain('mcp.config_label'), 'single' => $docs['mcp_config']])
           </div>
+        </div>
+
+        {{-- Claude, step by step (named here by the owner's choice, CLAUDE.md). Its buttons keep their own English names. --}}
+        @php
+          $mcpUrl = url('/mcp');
+          $ui = fn (string $text) => preg_replace('/\*\*([^*]+)\*\*/', '<strong class="docs-ui" dir="auto">$1</strong>', \App\Support\Api\ApiDocs::richText(str_replace(':url', $mcpUrl, $text)));
+        @endphp
+        <div class="docs-text docs-subrow" id="mcp-claude">
+          <h4>{{ $plain('mcp.claude.title') }}{!! $anchor('mcp-claude') !!}</h4>
+          <p>{!! $ui($plain('mcp.claude.body')) !!}</p>
+          <ol class="docs-steps">
+            @foreach(__('developers.docs.mcp.claude.steps') as $step)
+              <li>{!! $ui($step) !!}</li>
+            @endforeach
+          </ol>
+          <p class="docs-note">{!! $ui($plain('mcp.claude.team')) !!}</p>
+        </div>
+        <div class="docs-row docs-subrow" id="mcp-claude-code">
+          <div class="docs-text">
+            <h4>{{ $plain('mcp.claude.code_title') }}{!! $anchor('mcp-claude-code') !!}</h4>
+            <p>{!! $ui($plain('mcp.claude.code_body')) !!}</p>
+          </div>
+          <div class="docs-code">
+            @include('developers._docs-code', ['label' => $plain('mcp.claude.code_label'), 'tag' => 'Claude Code', 'single' => $docs['mcp_claude_code']])
+          </div>
+        </div>
+        <div class="docs-text" id="mcp-claude-help">
+          <h4>{{ $plain('mcp.claude.trouble_title') }}{!! $anchor('mcp-claude-help') !!}</h4>
+          <ul>
+            @foreach(__('developers.docs.mcp.claude.trouble') as $point)
+              <li>{!! $ui($point) !!}</li>
+            @endforeach
+          </ul>
+        </div>
+
+        <div class="docs-text docs-subrow">
+          <h4>{{ $plain('mcp.tools_title') }}</h4>
+          <p>{{ $plain('mcp.tools_body') }}</p>
+          <dl class="docs-params">
+            @foreach(\App\Mcp\Servers\ListenServer::toolNames() as $tool)
+              <div class="docs-param"><dt><code dir="ltr" class="docs-param-name">{{ $tool }}</code></dt><dd>{{ __('developers.docs.mcp.tools.'.($tool === 'get_account' && $speechToTextPublic ? 'get_account_speech_to_text' : $tool)) }}</dd></div>
+            @endforeach
+          </dl>
         </div>
       </section>
       @endif
@@ -271,7 +307,7 @@
                   <tr>
                     <th scope="row">{{ $plain('plans.row_credits') }}</th>
                     @foreach($planRows as $row)
-                      <td>{{ number_format($row['credits']) }}@if($row['is_pack'])<span class="sr-only">{{ $plain('plans.row_credits_pack') }}</span>@endif</td>
+                      <td>{{ number_format($row['credits']) }}@if($row['is_pack'])<small class="docs-plans-sub">{{ $plain('plans.row_credits_pack') }}</small>@endif</td>
                     @endforeach
                   </tr>
                   <tr>
@@ -433,6 +469,7 @@
               @foreach(__('developers.docs.idempotency.points') as $point)
                 <li>{!! $tx($point) !!}</li>
               @endforeach
+              @if($speechToTextPublic)<li>{!! $t('idempotency.point_speech_to_text') !!}</li>@endif
             </ul>
           </div>
           <div class="docs-code">
@@ -548,7 +585,7 @@
                     @php
                       [$status, $code, $meaning] = $error;
                     @endphp
-                    @continue(isset($error[3]) && ! ($offered[$error[3]] ?? false))
+                    @continue(isset($error[3]) && ! ($error[3] === 'speech_to_text' ? $speechToTextPublic : ($offered[$error[3]] ?? false)))
                     <tr><td><span class="docs-status mono {{ str_starts_with($status, '5') ? 's5' : '' }}" data-code>{{ $status }}</span></td><td><code dir="ltr">{{ $code }}</code></td><td>{!! $tx($meaning) !!}</td></tr>
                   @endforeach
                 </tbody>
@@ -564,9 +601,10 @@
             @foreach(__('developers.docs.limits.points') as $point)
               <li>{!! $tx($point) !!}</li>
             @endforeach
+            @if($speechToTextPublic)<li>{!! $t('limits.point_speech_to_text') !!}</li>@endif
           </ul>
           <dl class="docs-params">
-            @foreach(['X-RateLimit-Limit', 'X-RateLimit-Remaining', 'Retry-After', 'X-Request-Id'] as $header)
+            @foreach(['X-RateLimit-Limit', 'X-RateLimit-Remaining', 'X-RateLimit-Reset', 'Retry-After', 'X-Request-Id'] as $header)
               <div class="docs-param"><dt><code dir="ltr" class="docs-param-name">{{ $header }}</code></dt><dd>{!! \App\Support\Api\ApiDocs::rich('developers.docs.headers.'.$header) !!}</dd></div>
             @endforeach
           </dl>
@@ -580,8 +618,9 @@
           <p><a href="{{ route('v1.openapi') }}" target="_blank" rel="noopener">{!! $t('versioning.openapi') !!}</a></p>
           <h4>{{ $plain('versioning.changelog_title') }}</h4>
           <dl class="docs-params docs-changelog">
-            @foreach(__('developers.docs.versioning.changelog') as [$date, $change])
-              <div class="docs-param"><dt><time datetime="{{ $date }}" dir="ltr">{{ $date }}</time></dt><dd>{{ $change }}</dd></div>
+            @foreach(__('developers.docs.versioning.changelog') as $entry)
+              @continue(($entry[2] ?? null) === 'speech_to_text' && ! $speechToTextPublic)
+              <div class="docs-param"><dt><time datetime="{{ $entry[0] }}" dir="ltr">{{ $entry[0] }}</time></dt><dd>{!! $tx($entry[1]) !!}</dd></div>
             @endforeach
           </dl>
         </div>

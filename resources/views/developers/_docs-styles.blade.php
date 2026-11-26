@@ -171,6 +171,11 @@
     .docs-code { min-width: 0; position: sticky; top: calc(var(--docs-top) + 28px); display: grid; gap: 1rem; }
     .docs-section h3, .docs-resource h3 { margin: 0 0 .9rem; font-size: 1.6rem; font-weight: 720; letter-spacing: -.022em; line-height: 1.25; color: var(--text); }
     .docs-text h4 { margin: 2rem 0 .5rem; font-size: 1.06rem; font-weight: 680; color: var(--text); }
+    /* A second part of a section (the steps for one app, the tools): its own row under the first, a line between. */
+    .docs-subrow { margin-top: 2.5rem; padding-top: 2.25rem; border-top: 1px solid var(--line); }
+    .docs-subrow > .docs-text > h4:first-child, .docs-subrow > h4:first-child { margin-top: 0; font-size: 1.22rem; }
+    /* The name of a button or menu in another app's own screen. */
+    .docs-ui { font-weight: 620; color: var(--text); white-space: nowrap; }
     html[dir="rtl"] :is(.docs-section h3, .docs-resource h3, .docs-text h4) { letter-spacing: 0; }
     .docs-section p, .docs-section li, .docs-resource > p { color: var(--muted); line-height: 1.75; font-size: 1.04rem; }
     .docs-section p { margin: 0 0 1rem; }
@@ -243,6 +248,7 @@
     .docs-plans thead th:first-child { position: sticky; inset-inline-start: 0; z-index: 2; }
     .docs-plans thead th:not(:first-child), .docs-plans td { text-align: center; }
     .docs-plans td { color: var(--text) !important; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .docs-plans-sub { display: block; margin-top: .1rem; font-size: .78rem; font-weight: 400; color: var(--muted); }
     .docs-plans .docs-plans-group th { padding-top: 1.1rem; font-weight: 650; color: var(--text); background: color-mix(in oklab, var(--text) 3%, var(--surface)); }
     .docs-yes, .docs-no { position: relative; display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; }
     .docs-yes { background: color-mix(in oklab, var(--violet) 15%, transparent); color: var(--accent-text, var(--violet)); }

@@ -51,6 +51,10 @@ These are the owner's standing instructions. Follow them in every session.
   site's public pages for visitors not signed in and on the free demo
   (`App\Support\Clarity`), never in the studio, for paying members, in the apps,
   or for visitors from the UK, the EEA or Switzerland.
+  A seventh exception the owner asked for (26 November 2026): the developers
+  page's AI apps (MCP) section names Claude and Claude Code, with the steps to
+  connect Listen in them, in English and Arabic (`lang/*/developers.php` →
+  `docs.mcp.claude`). Text only, no logo, and nowhere else on the site.
 
 ## Email
 - Never send email. Draft it only, and let the owner send it.

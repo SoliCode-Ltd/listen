@@ -33,6 +33,11 @@ final class TranscriptionApi
         'site_busy' => ['service_busy', null],
     ];
 
+    /** Refusals that pass by themselves (the member's or the site's transcriptions are all busy), and how long to wait. */
+    private const WAIT = ['busy', 'site_busy'];
+
+    public const WAIT_SECONDS = 30;
+
     public static function status(string $status): string
     {
         return $status === Transcription::READY ? 'completed' : $status;
@@ -148,6 +153,9 @@ final class TranscriptionApi
             ? ['upgrade_plan' => (string) $e->upgrade['plan'], 'upgrade_url' => (string) ($e->upgrade['url'] ?? '')]
             : [];
 
-        return new ApiError($e->status, $type, $code, $e->getMessage(), $param, [], $e->extra + $upgrade);
+        // The two refusals that waiting solves say how long to wait.
+        $headers = in_array($e->reason, self::WAIT, true) ? ['Retry-After' => (string) self::WAIT_SECONDS] : [];
+
+        return new ApiError($e->status, $type, $code, $e->getMessage(), $param, $headers, $e->extra + $upgrade);
     }
 }

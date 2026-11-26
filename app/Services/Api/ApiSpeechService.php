@@ -449,7 +449,7 @@ class ApiSpeechService
             throw ApiFeatureGate::refusal(ApiFeatureGate::SOUND_ENVIRONMENTS, 'audio_effect');
         }
         if (! AudioEffects::available()) {
-            throw new ApiError(503, ApiError::TYPE_API, 'feature_unavailable', 'Sound environments are temporarily unavailable. Try again later, or leave audio_effect out.', 'audio_effect');
+            throw new ApiError(503, ApiError::TYPE_API, 'feature_unavailable', 'Sound environments are temporarily unavailable. Try again later, or leave audio_effect out.', 'audio_effect', ['Retry-After' => '60']);
         }
 
         return $effect;
@@ -541,7 +541,7 @@ class ApiSpeechService
             throw ApiFeatureGate::formatRefusal($format);
         }
         if (! in_array($format, self::formatsFor($plan), true)) {
-            throw new ApiError(503, ApiError::TYPE_API, 'output_format_unavailable', "The {$format} output format is temporarily unavailable. Use mp3.", 'output_format');
+            throw new ApiError(503, ApiError::TYPE_API, 'output_format_unavailable', "The {$format} output format is temporarily unavailable. Use mp3.", 'output_format', ['Retry-After' => '60']);
         }
     }
 }

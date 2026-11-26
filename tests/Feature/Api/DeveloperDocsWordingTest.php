@@ -80,16 +80,61 @@ class DeveloperDocsWordingTest extends TestCase
 
     public function test_quota_exceeded_also_answers_the_monthly_request_limit(): void
     {
-        $this->docs('en')->assertSee('Your plan does not have enough credits left this month, or its monthly request limit is reached.');
-        $this->docs('ar')->assertSee('لا تكفي أرصدة باقتك المتبقية هذا الشهر، أو بلغت باقتك حدها الشهري من الطلبات.');
+        $this->docs('en')->assertSee('You do not have enough credits left this month, or your plan\'s monthly generation limit is reached.');
+        $this->docs('ar')->assertSee('لا تكفي أرصدتك المتبقية هذا الشهر، أو بلغت باقتك حدها الشهري من عمليات التوليد.');
         $spec = (string) json_encode($this->getJson('/v1/openapi.json')->assertOk()->json());
-        $this->assertStringContainsString("or the plan's monthly request limit is reached.", $spec);
+        $this->assertStringContainsString("or the plan's monthly generation limit is reached.", $spec);
 
         // With credits left, the plan's last generation of the month is the last one.
         $plain = $this->issueKey($this->apiMember($this->apiPlan(['monthly_requests' => 1])))['plain'];
         $voice = $this->premiumVoice();
         $this->speak($plain, $voice, ['text' => 'First of the month.'])->assertOk();
         $this->assertApiError($this->speak($plain, $voice, ['text' => 'Second of the month.']), 402, 'quota_exceeded', 'quota_error');
+    }
+
+    /** Claude is named on this page only, by the owner's choice (CLAUDE.md): the steps to connect Listen in it. */
+    public function test_the_page_says_how_to_connect_in_claude_in_both_languages(): void
+    {
+        $address = url('/mcp');
+        $this->docs('en')
+            ->assertSee('Connect in Claude')
+            ->assertSee('<strong class="docs-ui" dir="auto">Add custom connector</strong>', false)
+            ->assertSee('<strong class="docs-ui" dir="auto">Register automatically</strong>', false)
+            ->assertSeeText('claude mcp add --transport http listen')
+            ->assertSee('paste <code dir="ltr">'.$address.'</code> as the address', false)
+            ->assertSee('If something does not work');
+        $this->docs('ar')
+            ->assertSee('الربط في Claude')
+            ->assertSee('<strong class="docs-ui" dir="auto">Add custom connector</strong>', false)
+            ->assertSee('الربط في Claude Code')
+            ->assertSee('إذا لم يعمل شيء');
+
+        // Nowhere else: the home page and the pricing page never name it.
+        foreach (['home', 'pricing'] as $route) {
+            $this->assertStringNotContainsString('Claude', (string) $this->getLocalizedRoute($route)->assertOk()->getContent());
+        }
+    }
+
+    /** What the page says about waiting matches the answers: a failed generation's audio, and the refusals that pass. */
+    public function test_the_answers_that_waiting_solves_say_how_long_and_a_failed_generation_says_so(): void
+    {
+        $this->docs('en')
+            ->assertSee('audio_failed')
+            ->assertSee('A <code dir="ltr">409</code> answer means something is still running', false)
+            ->assertDontSee('Requests a month');
+        $this->docs('ar')->assertSee('audio_failed');
+        // The plans table's monthly row counts generations (shared with the studio), not requests.
+        $this->assertSame('Generations a month', __('developers.docs.plans.row_monthly_requests', [], 'en'));
+        $this->assertSame('عمليات التوليد في الشهر', __('developers.docs.plans.row_monthly_requests', [], 'ar'));
+
+        $busy = \App\Support\Transcription\TranscriptionApi::error(new \App\Services\Transcription\TranscriptionRefused('busy', 'Busy.', 429));
+        $this->assertSame('too_many_transcriptions', $busy->errorCode);
+        $this->assertSame(['Retry-After' => '30'], $busy->headers);
+        $site = \App\Support\Transcription\TranscriptionApi::error(new \App\Services\Transcription\TranscriptionRefused('site_busy', 'Busy.', 503));
+        $this->assertSame(['Retry-After' => '30'], $site->headers);
+        // A limit that waiting a little does not lift sends none.
+        $limit = \App\Support\Transcription\TranscriptionApi::error(new \App\Services\Transcription\TranscriptionRefused('translation_limit', 'Limit.', 429));
+        $this->assertSame([], $limit->headers);
     }
 
     public function test_the_javascript_samples_say_to_save_them_as_an_es_module(): void
