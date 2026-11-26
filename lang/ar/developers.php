@@ -233,7 +233,8 @@ return [
             // Claude, named here by the owner's choice (CLAUDE.md): the steps to connect Listen in it.
             'claude' => [
                 'title' => 'الربط في Claude',
-                'body' => 'يتصل Claude بتسجيل الدخول بإسمع، على الويب وفي تطبيق سطح المكتب. ويعمل ذلك في كل باقات Claude، والباقة المجانية تقبل موصّلًا مخصصًا واحدًا.',
+                'body' => 'يتصل Claude بتسجيل الدخول بإسمع. ويعمل ذلك في كل باقات Claude، والباقة المجانية تقبل موصّلًا مخصصًا واحدًا.',
+                'web_title' => 'على الويب وفي تطبيق سطح المكتب',
                 // A button of Claude's own screen: its meaning in Arabic, then its name as the screen shows it.
                 'steps' => [
                     'في Claude افتح **التخصيص|Customize** ثم **الموصّلات|Connectors**، واضغط **إضافة|+ Add** ثم **إضافة موصّل مخصص|Add custom connector**.',
@@ -243,9 +244,9 @@ return [
                     'في أي محادثة اضغط **+** أسفل الشاشة ثم **الموصّلات|Connectors**، وتأكد أن إسمع مفعّل، ثم اطلب ما تحتاجه.',
                 ],
                 'team' => 'في مساحات عمل الفرق والمؤسسات يضيف أحد المالكين إسمع أولًا (الخطوات 1 إلى 3)، ثم يضغط كل عضو **اتصال|Connect** ويسجّل الدخول بحسابه في إسمع.',
-                'code_title' => 'الربط في Claude Code',
-                'code_body' => 'شغّل الأمر الأول في الطرفية، ثم اكتب `/mcp` في Claude Code واختر `listen` وسجّل الدخول بإسمع في المتصفح الذي يُفتح. وفي الباقات التي تشمل واجهة المطورين يربط الأمر الثاني بمفتاح بدلًا من تسجيل الدخول.',
-                'code_label' => 'الطرفية',
+                'code_title' => 'في Claude Code',
+                'code_body' => 'شغّل الأمر الأول في Terminal، ثم اكتب `/mcp` في Claude Code واختر `listen` وسجّل الدخول بإسمع في المتصفح الذي يُفتح. وفي الباقات التي تشمل واجهة المطورين يربط الأمر الثاني بمفتاح بدلًا من تسجيل الدخول.',
+                'code_label' => 'Terminal',
                 'trouble_title' => 'إذا لم يعمل شيء',
                 'trouble' => [
                     'تعذّر على Claude الاتصال: تأكد أن العنوان هو `:url` تمامًا ولا شيء بعد `/mcp`، واختر **التسجيل التلقائي|Register automatically**.',

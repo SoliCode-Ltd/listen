@@ -98,6 +98,9 @@ class DeveloperDocsWordingTest extends TestCase
         $address = url('/mcp');
         $this->docs('en')
             ->assertSee('Connect in Claude')
+            ->assertSee('On the web and in the desktop app')
+            ->assertSee('In Claude Code')
+            ->assertDontSee('Connect in Claude Code')
             ->assertSee('<strong class="docs-ui" dir="auto">Add custom connector</strong>', false)
             ->assertSee('<strong class="docs-ui" dir="auto">Register automatically</strong>', false)
             ->assertSeeText('claude mcp add --transport http listen')
@@ -108,7 +111,10 @@ class DeveloperDocsWordingTest extends TestCase
             // Arabic first, then the button's name as Claude's screen shows it.
             ->assertSee('<strong class="docs-ui" dir="auto">إضافة موصّل مخصص</strong> <span class="docs-ui-as" dir="ltr">(Add custom connector)</span>', false)
             ->assertSee('<strong class="docs-ui" dir="auto">إسمع</strong>', false)
-            ->assertSee('الربط في Claude Code')
+            ->assertSee('في Claude Code')
+            // The code panel keeps its English name in Arabic.
+            ->assertSee('Terminal')
+            ->assertDontSee('الطرفية')
             ->assertSee('إذا لم يعمل شيء');
 
         // Nowhere else: the home page and the pricing page never name it.

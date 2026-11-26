@@ -255,6 +255,7 @@
         <div class="docs-text docs-subrow" id="mcp-claude">
           <h4>{{ $plain('mcp.claude.title') }}{!! $anchor('mcp-claude') !!}</h4>
           <p>{!! $ui($plain('mcp.claude.body')) !!}</p>
+          <h5 class="docs-sub">{{ $plain('mcp.claude.web_title') }}</h5>
           <ol class="docs-steps">
             @foreach(__('developers.docs.mcp.claude.steps') as $step)
               <li>{!! $ui($step) !!}</li>
@@ -262,9 +263,10 @@
           </ol>
           <p class="docs-note">{!! $ui($plain('mcp.claude.team')) !!}</p>
         </div>
-        <div class="docs-row docs-subrow" id="mcp-claude-code">
+        {{-- One title for Claude; the two ways to connect are parts of it, not sections of their own. --}}
+        <div class="docs-row docs-follows" id="mcp-claude-code">
           <div class="docs-text">
-            <h4>{{ $plain('mcp.claude.code_title') }}{!! $anchor('mcp-claude-code') !!}</h4>
+            <h5 class="docs-sub">{{ $plain('mcp.claude.code_title') }}{!! $anchor('mcp-claude-code') !!}</h5>
             <p>{!! $ui($plain('mcp.claude.code_body')) !!}</p>
           </div>
           <div class="docs-code">
@@ -272,7 +274,7 @@
           </div>
         </div>
         <div class="docs-text" id="mcp-claude-help">
-          <h4>{{ $plain('mcp.claude.trouble_title') }}{!! $anchor('mcp-claude-help') !!}</h4>
+          <h5 class="docs-sub">{{ $plain('mcp.claude.trouble_title') }}{!! $anchor('mcp-claude-help') !!}</h5>
           <ul>
             @foreach(__('developers.docs.mcp.claude.trouble') as $point)
               <li>{!! $ui($point) !!}</li>
