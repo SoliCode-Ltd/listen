@@ -2,55 +2,50 @@
 
 /*
  * One-off, read-only (READ ONLY database session), run through the "Server deploy"
- * workflow's data-checks mode from this branch only: how long recent recordings took
- * from request to ready, and how the queue that makes them is running. Ids and
- * numbers only: no text, no member, nothing written.
+ * workflow's data-checks mode from this branch only: the public growth numbers for
+ * a social video. Counts only (no money, no member, no text); nothing written.
  */
 require 'vendor/autoload.php';
 $app = require 'bootstrap/app.php';
 $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 if (in_array(DB::connection()->getDriverName(), ['mysql', 'mariadb'], true)) {
     DB::statement('SET SESSION TRANSACTION READ ONLY');
 }
+App\Support\MemberReach::forget();
+$members = DB::table('users')->where(fn ($q) => $q->where('is_admin', false)->orWhereNull('is_admin'));
 echo 'Now (UTC): ', now()->utc()->toDateTimeString(), "\n";
-echo '== Queue: connection ', config('queue.default'), ', retry_after ', config('queue.connections.'.config('queue.default').'.retry_after'), " ==\n";
-if (Schema::hasTable('jobs')) {
-    echo '  jobs waiting now: ', DB::table('jobs')->count(), ', oldest waiting (s): ', (int) (time() - (int) (DB::table('jobs')->min('available_at') ?: time())), "\n";
-}
-$ps = @shell_exec('ps -eo etimes,args 2>/dev/null | grep -E "queue:(work|listen)|horizon|schedule:(run|work)" | grep -v grep');
-echo "  worker processes (seconds running, command):\n", $ps ? preg_replace('/^/m', '    ', trim($ps)) : '    none seen', "\n";
-$cron = @shell_exec('crontab -l 2>/dev/null | grep -v "^#" | grep -i -E "artisan|queue|schedule"');
-echo "  cron lines:\n", $cron ? preg_replace('/^/m', '    ', trim(preg_replace('/[A-Za-z0-9_]*(KEY|SECRET|TOKEN|PASSWORD)=\S+/i', '$1=[hidden]', $cron))) : '    none', "\n";
+echo 'members: ', (clone $members)->count(), ', countries: ', App\Support\MemberReach::countryCount(), ', shown: ', App\Support\MemberReach::membersRoundedDown(), "\n";
 
-echo '== audio_generations columns: ', implode(', ', Schema::getColumnListing('audio_generations')), " ==\n";
+echo "== members joined, by month (and running total) ==\n";
+$run = 0;
+foreach ((clone $members)->selectRaw("date_format(created_at, '%Y-%m') as m, count(*) as n")->groupBy('m')->orderBy('m')->get() as $r) {
+    $run += $r->n; echo '  ', $r->m, ' ', $r->n, ' ', $run, "\n";
+}
+echo "== members joined, last 8 weeks ==\n";
+foreach ((clone $members)->where('created_at', '>=', now()->subWeeks(8))->selectRaw("yearweek(created_at, 3) as w, min(date(created_at)) as d, count(*) as n")->groupBy('w')->orderBy('w')->get() as $r) {
+    echo '  ', $r->d, ' ', $r->n, "\n";
+}
+echo "== members by region of the world (top countries) ==\n";
+$c = App\Support\MemberReach::counts()['countries'];
+arsort($c);
+foreach (array_slice($c, 0, 12, true) as $code => $n) { echo '  ', $code, ' ', $n, "\n"; }
+$total = array_sum($c);
+$arab = ['EG','SA','AE','KW','QA','BH','OM','JO','LB','SY','IQ','PS','YE','SD','LY','TN','DZ','MA','MR','SO','DJ','KM'];
+echo '  with a country: ', $total, ', in Arab countries: ', array_sum(array_intersect_key($c, array_flip($arab))), "\n";
 
-$g = DB::table('audio_generations')->where('id', 9757)->first();
-if ($g) {
-    $snap = json_decode((string) ($g->settings_snapshot ?? ''), true) ?: [];
-    echo '== Recording 9757: status ', $g->status, ', created ', $g->created_at, ', updated ', $g->updated_at,
-        ', seconds between: ', strtotime((string) $g->updated_at) - strtotime((string) $g->created_at), ', tier ', $g->voice_tier ?? '?', " ==\n";
-    echo '  snapshot keys: ', implode(', ', array_keys($snap)), "\n";
-    foreach ($snap as $k => $v) {
-        if (preg_match('/time|ms|second|attempt|retry|provider|model|rewrite|check|queue|wait|took|latency/i', (string) $k) && ! is_array($v)) {
-            echo '  ', $k, ': ', is_scalar($v) ? substr((string) $v, 0, 80) : gettype($v), "\n";
-        }
-    }
+echo "== recordings made (done), and audio hours ==\n";
+$done = DB::table('audio_generations')->where('status', 'done');
+echo '  all time: ', (clone $done)->count(), ' recordings, ', round((clone $done)->sum('duration_seconds') / 3600), " hours of audio\n";
+foreach ((clone $done)->selectRaw("date_format(created_at, '%Y-%m') as m, count(*) as n, round(sum(duration_seconds)/3600) as h")->groupBy('m')->orderBy('m')->get() as $r) {
+    echo '  ', $r->m, ' ', $r->n, ' recordings, ', $r->h, " h\n";
 }
-
-echo "== Last 40 finished recordings: seconds from request to ready (id, source, tier, characters, audio seconds, took) ==\n";
-$rows = DB::table('audio_generations as a')->leftJoin('text_items as t', 't.id', '=', 'a.text_item_id')
-    ->where('a.status', 'done')->orderByDesc('a.id')->limit(40)
-    ->get(['a.id', 'a.created_at', 'a.updated_at', 'a.voice_tier', 'a.billable_chars', 'a.duration_seconds', 't.source_type']);
-$took = [];
-foreach ($rows as $r) {
-    $s = strtotime((string) $r->updated_at) - strtotime((string) $r->created_at);
-    $took[] = $s;
-    echo '  ', $r->id, ' ', $r->source_type ?? '-', ' ', $r->voice_tier ?? '-', ' chars ', (int) $r->billable_chars, ' audio ', (int) $r->duration_seconds, 's took ', $s, "s\n";
+echo "== Arabic and English ==\n";
+foreach ((clone $done)->selectRaw('target_language as l, count(*) as n')->groupBy('l')->orderByDesc('n')->limit(4)->get() as $r) { echo '  ', $r->l, ' ', $r->n, "\n"; }
+echo "== most used dialects ==\n";
+foreach ((clone $done)->whereNotNull('dialect')->selectRaw('dialect as d, count(*) as n')->groupBy('d')->orderByDesc('n')->limit(8)->get() as $r) { echo '  ', $r->d, ' ', $r->n, "\n"; }
+if (Illuminate\Support\Facades\Schema::hasTable('transcriptions')) {
+    echo '== transcriptions done: ', DB::table('transcriptions')->where('status', 'ready')->count(), ", hours: ", round(DB::table('transcriptions')->where('status', 'ready')->sum('duration_seconds') / 3600), " ==\n";
 }
-if ($took !== []) {
-    sort($took);
-    echo '  median ', $took[(int) floor(count($took) / 2)], 's, fastest ', $took[0], 's, slowest ', end($took), "s\n";
-}
+echo '== studio voices: ', DB::table('voices')->where('is_active', true)->count(), " ==\n";
