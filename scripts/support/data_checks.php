@@ -35,17 +35,7 @@ $total = array_sum($c);
 $arab = ['EG','SA','AE','KW','QA','BH','OM','JO','LB','SY','IQ','PS','YE','SD','LY','TN','DZ','MA','MR','SO','DJ','KM'];
 echo '  with a country: ', $total, ', in Arab countries: ', array_sum(array_intersect_key($c, array_flip($arab))), "\n";
 
-echo "== recordings made (done), and audio hours ==\n";
-$done = DB::table('audio_generations')->where('status', 'done');
-echo '  all time: ', (clone $done)->count(), ' recordings, ', round((clone $done)->sum('duration_seconds') / 3600), " hours of audio\n";
-foreach ((clone $done)->selectRaw("date_format(created_at, '%Y-%m') as m, count(*) as n, round(sum(duration_seconds)/3600) as h")->groupBy('m')->orderBy('m')->get() as $r) {
-    echo '  ', $r->m, ' ', $r->n, ' recordings, ', $r->h, " h\n";
-}
-echo "== Arabic and English ==\n";
-foreach ((clone $done)->selectRaw('target_language as l, count(*) as n')->groupBy('l')->orderByDesc('n')->limit(4)->get() as $r) { echo '  ', $r->l, ' ', $r->n, "\n"; }
-echo "== most used dialects ==\n";
-foreach ((clone $done)->whereNotNull('dialect')->selectRaw('dialect as d, count(*) as n')->groupBy('d')->orderByDesc('n')->limit(8)->get() as $r) { echo '  ', $r->d, ' ', $r->n, "\n"; }
-if (Illuminate\Support\Facades\Schema::hasTable('transcriptions')) {
-    echo '== transcriptions done: ', DB::table('transcriptions')->where('status', 'ready')->count(), ", hours: ", round(DB::table('transcriptions')->where('status', 'ready')->sum('duration_seconds') / 3600), " ==\n";
-}
-echo '== studio voices: ', DB::table('voices')->where('is_active', true)->count(), " ==\n";
+echo "== countries outside the Arab world, most members first ==\n";
+foreach (array_slice(array_diff_key($c, array_flip($arab)), 0, 15, true) as $code => $n) { echo '  ', $code, ' ', $n, "\n"; }
+echo '  outside the Arab world: ', $total - array_sum(array_intersect_key($c, array_flip($arab))), ' members in ', count(array_diff_key($c, array_flip($arab))), " countries\n";
+echo '  Arab countries with members: ', count(array_intersect_key($c, array_flip($arab))), "\n";
