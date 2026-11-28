@@ -683,6 +683,34 @@ class RenewalGraceTest extends TestCase
             ->assertDontSee('id="paymentGraceNotice"', false);
     }
 
+    public function test_the_cancel_dialog_says_what_cancelling_does_now_and_once_paid(): void
+    {
+        $this->travelTo(Carbon::parse('2026-10-14 11:05:00'));
+        $this->stripeHas('past_due');
+        $this->paymentFailed()->assertOk();
+
+        // In the grace days, cancelling ends the plan now: the dialog says so, and asks why.
+        $this->travelTo(Carbon::parse('2026-10-16 09:00:00'));
+        $html = (string) $this->actingAs($this->member)->getLocalizedRoute('manage-subscription.page')->assertOk()->getContent();
+        $dialog = substr($html, (int) strpos($html, '<dialog class="cx" id="cancelDialog"'));
+        $dialog = substr($dialog, 0, (int) strpos($dialog, '</dialog>'));
+        $this->assertStringContainsString('id="cancelBtn"', $html);
+        $this->assertStringContainsString(e(__('ui.manage_subscription.confirm_cancel_unpaid_prompt')), $dialog);
+        $this->assertSame(5, substr_count($dialog, 'name="reason"'));
+        $this->assertSame(5, substr_count($dialog, ' required '));
+        $this->assertStringContainsString(e(__('ui.manage_subscription.cancel_reasons.quality')), $dialog);
+        $this->assertStringContainsString('formnovalidate', $dialog, 'Keep my plan always closes it.');
+
+        // Paid: cancelling keeps the plan to its end date, which the dialog gives.
+        $this->stripeHas('active');
+        $this->sync();
+        $html = (string) $this->actingAs($this->member)->getLocalizedRoute('manage-subscription.page')->assertOk()->getContent();
+        $this->assertStringNotContainsString(e(__('ui.manage_subscription.confirm_cancel_unpaid_prompt')), $html);
+        // With its end date when known, else "until the end of the period you paid for".
+        preg_match('/<p class="cx-lead">(.*?)<\/p>/s', $html, $lead);
+        $this->assertMatchesRegularExpression('/^Your plan stays on until .+nothing more is charged\. You can turn renewal back on any time before then\.$/', trim($lead[1] ?? ''));
+    }
+
     public function test_checkout_during_the_grace_never_replaces_the_subscription_and_sends_the_member_to_pay_it(): void
     {
         $this->travelTo(Carbon::parse('2026-10-14 11:05:00'));
