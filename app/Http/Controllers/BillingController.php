@@ -1902,6 +1902,8 @@ class BillingController extends Controller
 
         if ($stripeId !== '' && ! in_array($stripeStatus, ['canceled', 'incomplete_expired'], true)) {
             try {
+                // Replaced by the plan bought now: not a cancellation.
+                \App\Services\Billing\CancellationLog::siteEnds($stripeId);
                 Cashier::stripe()->subscriptions->cancel($stripeId, []);
             } catch (ApiErrorException $exception) {
                 Log::warning('Unable to cancel stale Stripe subscription before recreate.', [

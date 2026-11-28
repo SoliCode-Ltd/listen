@@ -20,6 +20,9 @@ return new class extends Migration
             $table->string('source', 16)->default('site')->after('stripe_subscription_id');
             $table->timestamp('resumed_at')->nullable()->after('email_sent_at');
         });
+
+        // Rows the cancel dialog saved before this column existed get their member's subscription.
+        \App\Services\Billing\CancellationLog::fillMissingSubscriptionIds();
     }
 
     public function down(): void

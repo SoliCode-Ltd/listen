@@ -17,7 +17,9 @@ use Laravel\Cashier\Cashier;
  * ended, read from Stripe one by one (never the whole Stripe account, which other sites share).
  *
  * Only cancellations count: a subscription Stripe ended because a payment failed or was
- * disputed, or one the member turned back on, is left out. Already imported subscriptions are
+ * disputed, one the site ended itself (unpaid past its grace days, an unfinished checkout
+ * replaced, a free trial an admin or a blocked account ended), or one the member turned
+ * back on, is left out. Already imported subscriptions are
  * skipped, so it can run any number of times. Reads Stripe only; writes this table only.
  *
  *   php artisan cancellations:import          a preview: what it would add, nothing written
@@ -45,7 +47,7 @@ class ImportCancellationsCommand extends Command
             ->orderBy('id')
             ->get();
 
-        $counts = ['added' => 0, 'payment_ended' => 0, 'kept' => 0, 'no_member' => 0, 'not_found' => 0, 'unknown' => 0];
+        $counts = ['added' => 0, 'payment_ended' => 0, 'site_ended' => 0, 'kept' => 0, 'no_member' => 0, 'not_found' => 0, 'unknown' => 0];
         $this->line(($write ? 'Adding' : 'Preview (nothing written):').' '.$candidates->count().' subscriptions set to end or ended, not yet listed.');
 
         foreach ($candidates as $local) {
@@ -56,7 +58,7 @@ class ImportCancellationsCommand extends Command
                 continue;
             }
             try {
-                $stripe = Cashier::stripe()->subscriptions->retrieve((string) $local->stripe_id, []);
+                $stripe = Cashier::stripe()->subscriptions->retrieve((string) $local->stripe_id, ['expand' => ['latest_invoice']]);
             } catch (\Throwable $e) {
                 $counts['not_found']++;
                 $this->line('  not read from Stripe: subscription #'.$local->id.' ('.mb_substr($e->getMessage(), 0, 80).')');
@@ -84,6 +86,13 @@ class ImportCancellationsCommand extends Command
 
                 continue;
             }
+            if ($status === 'canceled' && ! $scheduled && $log->siteEndedAtOnce((string) $stripe->id, $stripe->latest_invoice ?? null)) {
+                // Ended at once by the site: a renewal left unpaid past its grace days, an
+                // unfinished checkout replaced, or a free trial an admin or a blocked account ended.
+                $counts['site_ended']++;
+
+                continue;
+            }
 
             $when = (int) ($stripe->canceled_at ?? 0) ?: (int) ($stripe->ended_at ?? 0);
             $this->line(sprintf('  %s member #%d, cancelled %s, %s',
@@ -100,7 +109,7 @@ class ImportCancellationsCommand extends Command
 
         $this->newLine();
         $this->line(($write ? 'Added' : 'Would add').': '.$counts['added']);
-        $this->line('Left out: '.$counts['payment_ended'].' ended by a failed or disputed payment, '.$counts['kept'].' turned back on, '
+        $this->line('Left out: '.$counts['payment_ended'].' ended by a failed or disputed payment, '.$counts['site_ended'].' ended by the site (unpaid, replaced, or a trial it ended), '.$counts['kept'].' turned back on, '
             .$counts['unknown'].' ended with no recorded request, '.$counts['no_member'].' with no member, '.$counts['not_found'].' not read from Stripe.');
 
         return self::SUCCESS;

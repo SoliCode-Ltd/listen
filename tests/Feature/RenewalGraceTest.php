@@ -468,6 +468,8 @@ class RenewalGraceTest extends TestCase
         $this->assertSame(1, $this->runGraceJob());
 
         $this->assertTrue($this->stripe->sent('delete', '/v1/subscriptions/sub_grace'));
+        // Ended by the site, not the member: Stripe's notice is not counted as a cancellation.
+        $this->assertTrue(\App\Services\Billing\CancellationLog::siteEnded('sub_grace'));
         // Cancelled without proration: the month it cut short was never paid, so it leaves no credit behind.
         $this->assertSame(['false'], $this->paramsSent('delete', '/v1/subscriptions/sub_grace', 'prorate'));
         // And its renewal can no longer be paid for a month the member does not get.

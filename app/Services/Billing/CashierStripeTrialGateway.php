@@ -140,6 +140,8 @@ class CashierStripeTrialGateway implements StripeTrialGateway
             return;
         }
 
+        // Ended by the site (an admin, a blocked or deleted account): not a member cancelling.
+        CancellationLog::siteEnds($subscriptionId);
         Cashier::stripe()->subscriptions->cancel($subscriptionId, []);
     }
 

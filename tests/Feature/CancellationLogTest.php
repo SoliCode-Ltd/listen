@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Filament\Widgets\CancellationReasonStats;
 use App\Models\BillingSubscription;
+use App\Models\BillingTrial;
 use App\Models\Plan;
 use App\Models\SiteSetting;
 use App\Models\Subscription;
@@ -13,6 +14,7 @@ use App\Services\Billing\CancellationLog;
 use App\Services\StripeWebhookEmailService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Stripe\ApiRequestor;
 use Stripe\HttpClient\ClientInterface;
 use Tests\TestCase;
@@ -132,6 +134,62 @@ class CancellationLogTest extends TestCase
         $this->assertSame(1, SubscriptionCancellation::query()->count());
     }
 
+    public function test_a_subscription_the_site_ended_itself_is_not_a_cancellation(): void
+    {
+        $endedNow = fn (string $id) => $this->stripeSubscription($id, [
+            'status' => 'canceled', 'cancel_at_period_end' => false, 'canceled_at' => now()->timestamp, 'ended_at' => now()->timestamp,
+            'latest_invoice' => 'in_'.$id, 'cancellation_details' => ['reason' => 'cancellation_requested'],
+        ]);
+
+        // The grace job, account deletion or a replaced checkout: marked just before the site asks Stripe.
+        CancellationLog::siteEnds('sub_by_site');
+        $this->event('customer.subscription.deleted', $endedNow('sub_by_site'));
+
+        // A free trial an admin (or a blocked account) ended.
+        BillingTrial::query()->create(['user_id' => $this->member->id, 'plan_id' => $this->plan->id, 'status' => BillingTrial::STATUS_BLOCKED,
+            'stripe_subscription_id' => 'sub_trial_blocked']);
+        $this->event('customer.subscription.deleted', $endedNow('sub_trial_blocked'));
+
+        $this->assertSame(0, SubscriptionCancellation::query()->count());
+
+        // One the member set to end, reaching its end with no earlier notice: still their cancellation.
+        CancellationLog::siteEnds('sub_set_to_end');
+        $this->event('customer.subscription.deleted', $this->stripeSubscription('sub_set_to_end', [
+            'status' => 'canceled', 'cancel_at_period_end' => true, 'canceled_at' => now()->subDays(20)->timestamp, 'ended_at' => now()->timestamp,
+            'cancellation_details' => ['reason' => 'cancellation_requested'],
+        ]));
+        $this->assertSame(['sub_set_to_end'], SubscriptionCancellation::query()->pluck('stripe_subscription_id')->all());
+    }
+
+    public function test_rows_the_dialog_saved_before_the_subscription_was_kept_get_it(): void
+    {
+        $other = User::factory()->create();
+        foreach ([['sub_older', null], ['sub_ending', now()->addDays(10)]] as [$id, $endsAt]) {
+            BillingSubscription::query()->create(['user_id' => $this->member->id, 'type' => 'default', 'stripe_id' => $id,
+                'stripe_status' => 'active', 'stripe_price' => 'price_creator_m', 'ends_at' => $endsAt]);
+        }
+        BillingSubscription::query()->create(['user_id' => $other->id, 'type' => 'default', 'stripe_id' => 'sub_others',
+            'stripe_status' => 'active', 'stripe_price' => 'price_creator_m']);
+        $mine = SubscriptionCancellation::create(['user_id' => $this->member->id, 'reason' => 'price', 'cancelled_at' => now()->subHour()]);
+        $theirs = SubscriptionCancellation::create(['user_id' => $other->id, 'reason' => 'other', 'cancelled_at' => now()->subHour()]);
+        $none = SubscriptionCancellation::create(['user_id' => User::factory()->create()->id, 'reason' => 'other', 'cancelled_at' => now()->subHour()]);
+
+        $this->assertSame(2, CancellationLog::fillMissingSubscriptionIds());
+        $this->assertSame('sub_ending', $mine->fresh()->stripe_subscription_id, 'The one set to end.');
+        $this->assertSame('sub_others', $theirs->fresh()->stripe_subscription_id);
+        $this->assertNull($none->fresh()->stripe_subscription_id);
+
+        // Found again: Stripe's notice at the end counts no second one, and Keep my plan takes it out.
+        $this->event('customer.subscription.deleted', $this->stripeSubscription('sub_ending', [
+            'status' => 'canceled', 'cancel_at_period_end' => true, 'canceled_at' => now()->subHour()->timestamp, 'ended_at' => now()->timestamp,
+            'cancellation_details' => ['reason' => 'cancellation_requested'],
+        ]));
+        $this->assertSame(1, SubscriptionCancellation::query()->where('user_id', $this->member->id)->count());
+        app(CancellationLog::class)->markResumed('sub_ending');
+        $this->assertNotNull($mine->fresh()->resumed_at);
+        $this->assertSame(0, DB::table('subscription_cancellations')->where('id', $mine->id)->whereNull('resumed_at')->count());
+    }
+
     public function test_another_sites_customer_on_the_shared_stripe_account_is_never_recorded(): void
     {
         $this->event('customer.subscription.updated', $this->stripeSubscription('sub_other', [
@@ -173,8 +231,24 @@ class CancellationLogTest extends TestCase
             'sub_old_kept' => $old('sub_old_kept', ['status' => 'active', 'cancel_at_period_end' => false, 'cancel_at' => null, 'canceled_at' => null]),
             'sub_scheduled' => $old('sub_scheduled', ['status' => 'active', 'cancel_at_period_end' => true, 'cancel_at' => Carbon::parse('2026-12-20')->timestamp,
                 'canceled_at' => Carbon::parse('2026-11-20')->timestamp, 'cancellation_details' => ['reason' => 'cancellation_requested']]),
+            // Ended at once on request in Stripe, its last invoice paid: counted.
+            'sub_ended_now' => $old('sub_ended_now', ['status' => 'canceled', 'cancel_at_period_end' => false, 'canceled_at' => Carbon::parse('2026-11-05')->timestamp,
+                'ended_at' => Carbon::parse('2026-11-05')->timestamp, 'cancellation_details' => ['reason' => 'cancellation_requested'],
+                'latest_invoice' => ['id' => 'in_paid', 'object' => 'invoice', 'status' => 'paid']]),
+            // Ended at once by the site's grace job: its renewal was never paid (voided). Stripe
+            // still says "cancellation requested".
+            'sub_grace_ended' => $old('sub_grace_ended', ['status' => 'canceled', 'cancel_at_period_end' => false, 'canceled_at' => Carbon::parse('2026-11-08')->timestamp,
+                'ended_at' => Carbon::parse('2026-11-08')->timestamp, 'cancellation_details' => ['reason' => 'cancellation_requested'],
+                'latest_invoice' => ['id' => 'in_void', 'object' => 'invoice', 'status' => 'void']]),
+            // A free trial an admin ended: its $0 invoice is paid, but the trial says who ended it.
+            'sub_trial_admin' => $old('sub_trial_admin', ['status' => 'canceled', 'cancel_at_period_end' => false, 'canceled_at' => Carbon::parse('2026-11-09')->timestamp,
+                'ended_at' => Carbon::parse('2026-11-09')->timestamp, 'cancellation_details' => ['reason' => 'cancellation_requested'],
+                'latest_invoice' => ['id' => 'in_zero', 'object' => 'invoice', 'status' => 'paid']]),
         ];
-        foreach (['sub_old_price' => 'canceled', 'sub_old_failed' => 'canceled', 'sub_old_kept' => 'active', 'sub_scheduled' => 'active', 'sub_listed' => 'active'] as $id => $status) {
+        BillingTrial::query()->create(['user_id' => $this->member->id, 'plan_id' => $this->plan->id, 'status' => BillingTrial::STATUS_CANCELED,
+            'stripe_subscription_id' => 'sub_trial_admin', 'canceled_at' => Carbon::parse('2026-11-09')]);
+        foreach (['sub_old_price' => 'canceled', 'sub_old_failed' => 'canceled', 'sub_old_kept' => 'active', 'sub_scheduled' => 'active', 'sub_listed' => 'active',
+            'sub_ended_now' => 'canceled', 'sub_grace_ended' => 'canceled', 'sub_trial_admin' => 'canceled'] as $id => $status) {
             BillingSubscription::query()->create([
                 'user_id' => $this->member->id, 'type' => 'default', 'stripe_id' => $id, 'stripe_status' => $status,
                 'stripe_price' => 'price_creator_m', 'ends_at' => now()->addDays(5),
@@ -183,22 +257,23 @@ class CancellationLogTest extends TestCase
         // Already listed (the cancel dialog): not read again.
         SubscriptionCancellation::create(['user_id' => $this->member->id, 'stripe_subscription_id' => 'sub_listed', 'source' => 'site', 'reason' => 'price', 'cancelled_at' => now()]);
 
-        $this->artisan('cancellations:import')->expectsOutputToContain('Would add: 2')->assertSuccessful();
+        $this->artisan('cancellations:import')->expectsOutputToContain('Would add: 3')
+            ->expectsOutputToContain('2 ended by the site')->assertSuccessful();
         $this->assertSame(1, SubscriptionCancellation::query()->count(), 'A preview writes nothing.');
         $this->assertNotContains('get /v1/subscriptions/sub_listed', $stripe->paths);
         $this->assertSame([], array_filter($stripe->paths, fn (string $p): bool => ! str_starts_with($p, 'get ')), 'Stripe is only read.');
 
-        $this->artisan('cancellations:import --write')->expectsOutputToContain('Added: 2')->assertSuccessful();
+        $this->artisan('cancellations:import --write')->expectsOutputToContain('Added: 3')->assertSuccessful();
         $imported = SubscriptionCancellation::query()->where('source', SubscriptionCancellation::SOURCE_IMPORT)->orderBy('cancelled_at')->get();
-        $this->assertSame(['sub_old_price', 'sub_scheduled'], $imported->pluck('stripe_subscription_id')->all());
+        $this->assertSame(['sub_old_price', 'sub_ended_now', 'sub_scheduled'], $imported->pluck('stripe_subscription_id')->all());
         $this->assertSame('not_needed', $imported[0]->reason);
         $this->assertSame('2026-10-03', $imported[0]->cancelled_at->toDateString());
-        $this->assertNull($imported[1]->reason);
-        $this->assertSame('2026-12-20', $imported[1]->ends_at->toDateString());
+        $this->assertNull($imported[2]->reason);
+        $this->assertSame('2026-12-20', $imported[2]->ends_at->toDateString());
 
         // Again: nothing more.
         $this->artisan('cancellations:import --write')->expectsOutputToContain('Added: 0')->assertSuccessful();
-        $this->assertSame(3, SubscriptionCancellation::query()->count());
+        $this->assertSame(4, SubscriptionCancellation::query()->count());
     }
 
     public function test_the_import_writes_only_on_the_live_site(): void
