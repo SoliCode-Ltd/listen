@@ -58,7 +58,7 @@ class CancellationEmailSettings extends Page implements HasForms
         return $schema
             ->components([
                 Section::make('Sending')
-                    ->description('Goes out by itself the moment a member cancels (on the site or in Stripe), once per cancellation, from the help mailbox: replies come back to you. The message says what happens, then asks why they cancelled; a member who already chose a reason in the cancel dialog is thanked instead (Billing → Cancellations lists the reasons). Switched off, members get the plain English "Cancellation scheduled" notice instead.')
+                    ->description('Goes out by itself the moment a member cancels (on the site or in Stripe), once per cancellation, from the help mailbox: replies come back to you. The message says what happens, then thanks the member for the reason they chose in the cancel dialog (Billing → Cancellations lists them). A member who cancels another way, for example in Stripe, gave no reason, so their email asks why instead. Switched off, members get the plain English "Cancellation scheduled" notice instead.')
                     ->columns(2)
                     ->schema([
                         Toggle::make('enabled')

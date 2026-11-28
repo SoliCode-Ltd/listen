@@ -249,6 +249,8 @@
     .cx-reason:has(input:checked) { border-color: var(--brand-accent, #7659FA); background: color-mix(in oklab, var(--brand-accent, #7659FA) 9%, transparent); }
     .cx-reason:has(input:focus-visible) { outline: 2px solid var(--brand-accent, #7659FA); outline-offset: 2px; }
     @media (hover: hover) { .cx-reason:not(:has(input:checked)):hover { background: var(--surface2); } }
+    .cx-error { margin: 2px 0 0; font-size: .86rem; font-weight: 600; color: color-mix(in oklab, var(--danger) 85%, var(--text)); }
+    .cx-reasons.is-missing .cx-reason { border-color: color-mix(in oklab, var(--danger) 55%, var(--line)); }
     .cx-note { display: block; margin-top: 16px; }
     .cx-note > span { display: block; }
     .cx-note textarea {
@@ -790,8 +792,8 @@
   </main>
 
   @if($hasCancelableSubscription)
-    {{-- Cancelling: what happens, then why (optional, Billing → Cancellations). The member can
-         cancel without choosing a reason; the cancellation email then asks for it. --}}
+    {{-- Cancelling: what happens, then why (Billing → Cancellations). A reason is required to
+         cancel; the note is optional. "Keep my plan" is always one tap away. --}}
     <dialog class="cx" id="cancelDialog" aria-labelledby="cancelDialogTitle">
       <form method="dialog" class="cx-body" id="cancelForm">
         <h2 class="cx-title" id="cancelDialogTitle">{{ __('ui.manage_subscription.cancel_dialog_title') }}</h2>
@@ -802,13 +804,14 @@
                 : __('ui.manage_subscription.cancel_dialog_lead_no_date')) }}</p>
 
         <fieldset class="cx-reasons">
-          <legend>{{ __('ui.manage_subscription.cancel_reason_question') }} <span>{{ __('ui.manage_subscription.cancel_reason_optional') }}</span></legend>
+          <legend>{{ __('ui.manage_subscription.cancel_reason_question') }}</legend>
           @foreach(\App\Models\SubscriptionCancellation::REASONS as $reason)
             <label class="cx-reason">
-              <input type="radio" name="reason" value="{{ $reason }}">
+              <input type="radio" name="reason" value="{{ $reason }}" required aria-describedby="cancelReasonError">
               <span>{{ __('ui.manage_subscription.cancel_reasons.'.$reason) }}</span>
             </label>
           @endforeach
+          <p class="cx-error" id="cancelReasonError" role="alert" hidden>{{ __('ui.manage_subscription.cancel_reason_required') }}</p>
         </fieldset>
 
         <label class="cx-note">
@@ -817,7 +820,7 @@
         </label>
 
         <div class="cx-btns">
-          <button class="btn btn-primary" type="submit" value="keep" autofocus>{{ __('ui.manage_subscription.cancel_keep') }}</button>
+          <button class="btn btn-primary" type="submit" value="keep" formnovalidate autofocus>{{ __('ui.manage_subscription.cancel_keep') }}</button>
           <button class="btn btn-danger" type="button" id="cancelConfirmBtn">{{ __('ui.manage_subscription.cancel_confirm') }}</button>
         </div>
       </form>
@@ -1076,18 +1079,31 @@
     cancelDialog?.addEventListener('cancel', (event) => { event.preventDefault(); closeCancelDialog(); });
     cancelDialog?.addEventListener('click', (event) => { if (event.target === cancelDialog) closeCancelDialog(); });
 
+    const cancelReasons = cancelForm?.querySelector('.cx-reasons');
+    const cancelReasonError = document.getElementById('cancelReasonError');
+    const showReasonMissing = (missing) => {
+      cancelReasons?.classList.toggle('is-missing', missing);
+      if (cancelReasonError) cancelReasonError.hidden = !missing;
+    };
+    cancelForm?.addEventListener('change', (event) => { if (event.target?.name === 'reason') showReasonMissing(false); });
+
     cancelBtn?.addEventListener('click', () => {
-      if (!cancelDialog || typeof cancelDialog.showModal !== 'function') {
-        // A browser without the dialog: the plain question, and no reason.
-        if (window.confirm(cancelBtn.dataset.confirm || i18n.confirm_cancel_prompt)) cancelSubscription({});
-        return;
-      }
-      cancelDialog.showModal();
+      if (!cancelDialog) return;
+      showReasonMissing(false);
+      if (typeof cancelDialog.showModal === 'function') cancelDialog.showModal();
+      else cancelDialog.setAttribute('open', '');
     });
 
     cancelConfirmBtn?.addEventListener('click', () => {
       const data = new FormData(cancelForm);
-      const answer = { reason: data.get('reason') || null, note: String(data.get('note') || '').trim() || null };
+      const reason = data.get('reason');
+      // A reason is required: say so, and take them to the first choice.
+      if (!reason) {
+        showReasonMissing(true);
+        cancelForm.querySelector('input[name="reason"]')?.focus();
+        return;
+      }
+      const answer = { reason, note: String(data.get('note') || '').trim() || null };
       closeCancelDialog();
       cancelSubscription(answer);
     });

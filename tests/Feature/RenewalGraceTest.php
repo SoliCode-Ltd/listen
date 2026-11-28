@@ -895,7 +895,7 @@ class RenewalGraceTest extends TestCase
 
         $this->stripe->answer('delete', '/v1/subscriptions/sub_grace', ['id' => 'sub_grace', 'object' => 'subscription', 'status' => 'canceled']);
         $this->stripeHasTheOpenRenewal();
-        $this->actingAs($this->member)->postJsonLocalizedRoute('billing.cancel')
+        $this->actingAs($this->member)->postJsonLocalizedRoute('billing.cancel', ['reason' => 'price'])
             ->assertOk()
             ->assertJsonPath('ok', true)
             ->assertJsonPath('ended', true)
@@ -933,7 +933,7 @@ class RenewalGraceTest extends TestCase
         $this->travelTo(Carbon::parse('2026-10-16 09:00:00'));
         $this->stripe->requests = [];
 
-        $this->actingAs($this->member)->postJsonLocalizedRoute('billing.cancel')
+        $this->actingAs($this->member)->postJsonLocalizedRoute('billing.cancel', ['reason' => 'price'])
             ->assertOk()
             ->assertJsonPath('ended', true);
 

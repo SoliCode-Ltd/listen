@@ -917,9 +917,9 @@ class BillingController extends Controller
     public function cancel(Request $request, BillingLifecycleService $billingLifecycle)
     {
         $user = $request->user();
-        // Why they are leaving, from the cancel dialog. Both are optional.
+        // Why they are leaving, from the cancel dialog: a reason is required, the note is not.
         $answer = $request->validate([
-            'reason' => ['nullable', 'string', 'in:'.implode(',', SubscriptionCancellation::REASONS)],
+            'reason' => ['required', 'string', 'in:'.implode(',', SubscriptionCancellation::REASONS)],
             'note' => ['nullable', 'string', 'max:'.SubscriptionCancellation::NOTE_MAX],
         ]);
 

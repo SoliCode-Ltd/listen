@@ -724,12 +724,13 @@ return [
         'confirm_cancel_unpaid_prompt' => "Cancel your subscription now? We couldn't take your latest payment, so your plan ends straight away and your account moves to the free plan. Nothing more will be charged.",
         'cancel_unpaid_note' => "We couldn't take your latest payment, so cancelling ends your plan straight away: your account moves to the free plan and nothing more is charged.",
         'cancellation_failed' => 'Failed to cancel subscription. Please try again.',
-        // The cancel dialog: what happens, and why they are leaving (optional; Billing → Cancellations).
+        // The cancel dialog: what happens, and why they are leaving (a reason is required; Billing → Cancellations).
         'cancel_dialog_title' => 'Cancel your subscription?',
         'cancel_dialog_lead' => 'Your plan stays on until :date, with all its features, and nothing more is charged. You can turn renewal back on any time before then.',
         'cancel_dialog_lead_no_date' => 'Your plan stays on until the end of the period you paid for, and nothing more is charged. You can turn renewal back on any time before then.',
         'cancel_reason_question' => 'Why are you cancelling?',
         'cancel_reason_optional' => 'Optional',
+        'cancel_reason_required' => 'Please choose a reason to continue.',
         'cancel_reasons' => [
             'price' => "The price didn't suit me",
             'quality' => "The voices or dialects weren't what I expected",

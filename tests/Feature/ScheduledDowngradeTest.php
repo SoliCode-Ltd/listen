@@ -377,7 +377,7 @@ class ScheduledDowngradeTest extends TestCase
         $before = count($this->stripe->requests);
 
         $this->actingAs($user)->withoutMiddleware($this->without())
-            ->postJson($this->localizedRoute('billing.cancel'))->assertOk()->assertJsonPath('ok', true);
+            ->postJson($this->localizedRoute('billing.cancel'), ['reason' => 'price'])->assertOk()->assertJsonPath('ok', true);
 
         $release = $this->stripe->indexOf('post', '/v1/subscription_schedules/sub_sched_1/release', $before);
         $cancel = $this->stripe->indexOfWith('post', '/v1/subscriptions/sub_dn', 'cancel_at_period_end', $before);
@@ -1086,15 +1086,27 @@ class ScheduledDowngradeTest extends TestCase
         $this->assertFalse($record->ended_now);
     }
 
-    public function test_a_member_can_cancel_without_giving_a_reason(): void
+    public function test_a_reason_is_required_to_cancel(): void
     {
         $user = $this->cardMember();
 
         $this->actingAs($user)->withoutMiddleware($this->without())
-            ->postJson($this->localizedRoute('billing.cancel'))->assertOk()->assertJsonPath('ok', true);
+            ->postJson($this->localizedRoute('billing.cancel'), ['note' => 'Just stop it.'])
+            ->assertStatus(422)->assertJsonValidationErrors('reason');
+
+        $this->assertSame(0, SubscriptionCancellation::query()->count());
+        $this->assertFalse($this->stripe->subscription['cancel_at_period_end'], 'Nothing was cancelled.');
+    }
+
+    public function test_the_note_is_optional(): void
+    {
+        $user = $this->cardMember();
+
+        $this->actingAs($user)->withoutMiddleware($this->without())
+            ->postJson($this->localizedRoute('billing.cancel'), ['reason' => 'not_needed'])->assertOk()->assertJsonPath('ok', true);
 
         $record = SubscriptionCancellation::query()->sole();
-        $this->assertNull($record->reason);
+        $this->assertSame('not_needed', $record->reason);
         $this->assertNull($record->note);
         $this->assertNotNull($record->cancelled_at);
     }
@@ -1127,7 +1139,7 @@ class ScheduledDowngradeTest extends TestCase
         $this->subscribe($user, 'starter')->assertOk();
         $this->stripe->failCancel = true;
 
-        $this->actingAs($user)->withoutMiddleware($this->without())->postJson($this->localizedRoute('billing.cancel'))
+        $this->actingAs($user)->withoutMiddleware($this->without())->postJson($this->localizedRoute('billing.cancel'), ['reason' => 'price'])
             ->assertStatus(422)->assertJsonPath('ok', false);
 
         $this->assertSame(['cancelled', 'scheduled'], PlanChange::query()->orderBy('id')->pluck('status')->all());
