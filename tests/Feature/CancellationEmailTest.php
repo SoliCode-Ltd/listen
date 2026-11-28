@@ -160,22 +160,46 @@ class CancellationEmailTest extends TestCase
 
     public function test_the_webhook_after_the_site_sends_nothing_more(): void
     {
-        $emails = app(StripeWebhookEmailService::class);
-        $emails->sendCancellationScheduledForUser($this->member);
-        // Stripe tells the same cancellation a moment later.
-        $emails->sendForEvent(json_decode(json_encode([
-            'id' => 'evt_cx', 'type' => 'customer.subscription.updated',
+        // Newer Stripe versions: the period end is on the items, not on the subscription.
+        $shapes = [
+            'cancel_at only' => ['cancel_at' => $this->endsAt->timestamp, 'items' => ['object' => 'list', 'data' => []]],
+            'item period end only' => ['items' => ['object' => 'list', 'data' => [['id' => 'si_1', 'current_period_end' => $this->endsAt->timestamp]]]],
+            'both on the subscription' => ['cancel_at' => $this->endsAt->timestamp, 'current_period_end' => $this->endsAt->timestamp, 'items' => ['object' => 'list', 'data' => []]],
+        ];
+        foreach ($shapes as $shape => $fields) {
+            Cache::flush();
+            $this->mailer()->flush();
+            $emails = app(StripeWebhookEmailService::class);
+            $emails->sendCancellationScheduledForUser($this->member);
+            // Stripe tells the same cancellation a moment later.
+            $emails->sendForEvent(json_decode(json_encode([
+                'id' => 'evt_cx_'.md5($shape), 'type' => 'customer.subscription.updated',
+                'data' => [
+                    'object' => ['id' => 'sub_cx', 'object' => 'subscription', 'customer' => 'cus_cx', 'status' => 'active', 'cancel_at_period_end' => true] + $fields,
+                    'previous_attributes' => ['cancel_at_period_end' => false],
+                ],
+            ])));
+
+            $this->assertCount(1, $this->sent(), $shape);
+        }
+    }
+
+    public function test_a_cancellation_in_stripe_with_the_period_end_on_its_items_is_dated(): void
+    {
+        app(StripeWebhookEmailService::class)->sendForEvent(json_decode(json_encode([
+            'id' => 'evt_items', 'type' => 'customer.subscription.updated',
             'data' => [
                 'object' => [
-                    'id' => 'sub_cx', 'object' => 'subscription', 'customer' => 'cus_cx', 'status' => 'active',
-                    'cancel_at_period_end' => true, 'cancel_at' => $this->endsAt->timestamp, 'current_period_end' => $this->endsAt->timestamp,
-                    'items' => ['object' => 'list', 'data' => []],
+                    'id' => 'sub_items', 'object' => 'subscription', 'customer' => 'cus_cx', 'status' => 'active', 'cancel_at_period_end' => true,
+                    'items' => ['object' => 'list', 'data' => [['id' => 'si_1', 'current_period_end' => $this->endsAt->timestamp]]],
                 ],
                 'previous_attributes' => ['cancel_at_period_end' => false],
             ],
         ])));
 
-        $this->assertCount(1, $this->sent());
+        $html = (string) $this->sent()->sole()->getOriginalMessage()->getHtmlBody();
+        $this->assertStringContainsString('15 December 2026', $html);
+        $this->assertStringContainsString('Keep my plan', $html);
     }
 
     public function test_a_cancellation_in_stripe_alone_gets_the_same_email(): void
@@ -265,6 +289,11 @@ class CancellationEmailTest extends TestCase
         app(StripeWebhookEmailService::class)->sendCancellationScheduledForUser($this->member);
 
         return (string) $this->sent()->last()->getOriginalMessage()->getHtmlBody();
+    }
+
+    private function mailer(): object
+    {
+        return app('mailer')->getSymfonyTransport();
     }
 
     private function sent(): Collection

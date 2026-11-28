@@ -706,9 +706,9 @@ class RenewalGraceTest extends TestCase
         $this->sync();
         $html = (string) $this->actingAs($this->member)->getLocalizedRoute('manage-subscription.page')->assertOk()->getContent();
         $this->assertStringNotContainsString(e(__('ui.manage_subscription.confirm_cancel_unpaid_prompt')), $html);
-        // With its end date when known, else "until the end of the period you paid for".
+        // With its end date when known, else "until the end of its current period"; true for a trial too.
         preg_match('/<p class="cx-lead">(.*?)<\/p>/s', $html, $lead);
-        $this->assertMatchesRegularExpression('/^Your plan stays on until .+nothing more is charged\. You can turn renewal back on any time before then\.$/', trim($lead[1] ?? ''));
+        $this->assertMatchesRegularExpression('/^Your plan stays on until .+you won&#039;t be charged from now on\. You can turn renewal back on any time before then\.$/', trim($lead[1] ?? ''));
     }
 
     public function test_checkout_during_the_grace_never_replaces_the_subscription_and_sends_the_member_to_pay_it(): void

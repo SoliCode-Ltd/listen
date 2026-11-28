@@ -18,7 +18,7 @@ use RuntimeException;
 
 /**
  * The email a member gets the moment they cancel their subscription: it will not renew,
- * nothing more is charged, the plan stays on until its end date, and a button to keep
+ * nothing is charged from now on, the plan stays on until its end date, and a button to keep
  * it. Between the two, a paragraph that answers the reason they chose in the cancel
  * dialog, with something real to stay for: a smaller plan or paying yearly when the
  * price was the reason (only what their plan really offers), help choosing a voice,
@@ -46,7 +46,7 @@ class CancellationEmail
             'headline_en' => "Your {plan} plan won't renew",
             'headline_ar' => 'تم إلغاء تجديد باقة {plan}',
             // "## " starts a heading, lines starting "- " are a list, **words** are bold.
-            'body_en' => "Hi {name},\n\nWe've cancelled the renewal of your {plan} plan, as you asked.\n\n## What happens now\n- Your plan keeps all its features until **{date}**.\n- You won't be charged again.\n- After that, your account moves to the free plan.",
+            'body_en' => "Hi {name},\n\nWe've cancelled the renewal of your {plan} plan, as you asked.\n\n## What happens now\n- Your plan keeps all its features until **{date}**.\n- You won't be charged from now on.\n- After that, your account moves to the free plan.",
             'body_ar' => "أهلاً {name}،\n\nألغينا تجديد اشتراكك في باقة {plan} كما طلبت.\n\n## ما الذي يحدث الآن\n- تبقى باقتك بكل مزاياها حتى **{date}**.\n- لن يُخصم منك أي مبلغ بعد الآن.\n- بعد ذلك ينتقل حسابك إلى الباقة المجانية.",
             // The section for the reason the member chose (SubscriptionCancellation::REASONS).
             // The price: a heading and opening, then a list of only what their plan really offers, then where to change it.

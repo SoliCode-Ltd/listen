@@ -726,8 +726,8 @@ return [
         'cancellation_failed' => 'Failed to cancel subscription. Please try again.',
         // The cancel dialog: what happens, and why they are leaving (a reason is required; Billing → Cancellations).
         'cancel_dialog_title' => 'Cancel your subscription?',
-        'cancel_dialog_lead' => 'Your plan stays on until :date, with all its features, and nothing more is charged. You can turn renewal back on any time before then.',
-        'cancel_dialog_lead_no_date' => 'Your plan stays on until the end of the period you paid for, and nothing more is charged. You can turn renewal back on any time before then.',
+        'cancel_dialog_lead' => 'Your plan stays on until :date, with all its features, and you won\'t be charged from now on. You can turn renewal back on any time before then.',
+        'cancel_dialog_lead_no_date' => 'Your plan stays on until the end of its current period, and you won\'t be charged from now on. You can turn renewal back on any time before then.',
         'cancel_reason_question' => 'Why are you cancelling?',
         'cancel_reason_optional' => 'Optional',
         'cancel_reason_required' => 'Please choose a reason to continue.',
