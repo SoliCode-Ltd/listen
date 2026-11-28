@@ -2105,3 +2105,39 @@ html[dir="rtl"] .vs-pron-arrow { transform: scaleX(-1); }
 @media (prefers-reduced-motion: reduce) {
   .vs-lib-tabs .glide-thumb, .vs-lib-gender .glide-thumb, .vs-lib-age .glide-thumb { transition: none; }
 }
+
+/*
+ * The chosen words' colour (data-glide-labels, js/glide.js): a copy of the labels in the chosen colour,
+ * cut to the thumb's shape and moved with it, so each word changes colour exactly where the thumb's edge
+ * passes. Under it, every button keeps the plain colour, the chosen one too.
+ */
+.vs-lib-tabs .glide-labels, .vs-lib-gender .glide-labels, .vs-lib-age .glide-labels {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2;
+  opacity: 0;
+  pointer-events: none;
+  transition: clip-path .25s cubic-bezier(.4, 0, .2, 1), opacity .2s ease;
+  will-change: clip-path;
+}
+.glide-labels > .glide-label {
+  position: absolute;
+  margin: 0;
+  box-sizing: border-box;
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  transition: none !important;
+}
+.vs-lib-tabs.has-glide > .vs-lib-tab[aria-selected="true"] { color: var(--muted); }
+.vs-lib-tabs.has-glide > .vs-lib-tab[aria-selected="true"] svg { color: currentColor; fill: none; }
+.vs-lib-tabs .glide-label { color: var(--text); }
+.vs-lib-tabs .glide-label svg { color: var(--a, #7659FA); fill: currentColor; }
+.vs-lib-gender.has-glide > button[aria-pressed="true"] { color: var(--muted); }
+.vs-lib-gender .glide-label { color: #FFFFFF; }
+.vs-lib-age.has-glide > button[aria-pressed="true"] { color: var(--muted); }
+.vs-lib-age .glide-label { color: var(--a, #7659FA); }
+@media (prefers-reduced-motion: reduce) {
+  .vs-lib-tabs .glide-labels, .vs-lib-gender .glide-labels, .vs-lib-age .glide-labels { transition: none; }
+}
