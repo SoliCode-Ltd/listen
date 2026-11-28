@@ -4,9 +4,11 @@ namespace App\Services;
 
 use App\Models\BillingSubscription;
 use App\Models\SiteSetting;
+use App\Models\SubscriptionCancellation;
 use App\Models\Subscription;
 use App\Models\User;
 use App\Services\Billing\RenewalGrace;
+use App\Services\Newsletter\CancellationEmail;
 use App\Support\LiveServer;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -126,7 +128,43 @@ class StripeWebhookEmailService
             'Manage Billing'
         );
 
-        $this->sendMail($user, 'Cancellation scheduled', $html);
+        $this->sendCancellationEmail($user, $billingSubscription->ends_at, $html);
+    }
+
+    /**
+     * The cancellation email (Newsletter → Cancellation): in both languages, in the site's
+     * email design, answering the reason the member chose in the cancel dialog (none when
+     * they cancelled in Stripe). Switched off there, the plain notice ($plainHtml) goes instead.
+     */
+    private function sendCancellationEmail(User $user, ?\DateTimeInterface $endsAt, string $plainHtml): void
+    {
+        $email = app(CancellationEmail::class);
+        if (! $email->enabled() || $endsAt === null) {
+            $this->sendMail($user, 'Cancellation scheduled', $plainHtml);
+
+            return;
+        }
+
+        // The reason saved by the cancel dialog; a lookup that fails (for example the table
+        // not there yet, between a deploy and its migration) leaves the "no reason" email.
+        $record = rescue(fn () => SubscriptionCancellation::recentFor($user), null, false);
+        $plan = Subscription::query()->with('plan')->where('user_id', $user->id)->latest('id')->first()?->plan;
+
+        try {
+            $email->send($user, $plan, $endsAt, $record?->reason);
+        } catch (\Throwable $exception) {
+            // Not sent (or not the live site): its "already sent" key is let go, so a retry can send it.
+            Log::warning('Unable to send the cancellation email.', [
+                'user_id' => $user->id,
+                'error' => $exception->getMessage(),
+            ]);
+
+            return;
+        }
+
+        // Sent: from now on the same email is never sent again.
+        $this->pendingEmailKey = null;
+        rescue(fn () => $record?->update(['email_sent_at' => now()]), null, false);
     }
 
     private function handleCheckoutSessionCompleted(object $session): void
@@ -287,14 +325,21 @@ class StripeWebhookEmailService
         }
 
         if ($changedCancelAtPeriodEnd && $cancelAtPeriodEnd) {
-            if ($this->shouldSkipEmail("cancel-scheduled:{$subscriptionId}:{$periodEnd}", 24 * 30)) {
+            // The day it ends: newer Stripe versions keep the period end on the subscription's
+            // items, not on the subscription. The "sent once" key is the same as the one the
+            // site uses when the member cancels there (its end date), so only one email goes.
+            $endsAtUnix = (int) ($subscription->cancel_at ?? 0)
+                ?: (int) ($subscription->current_period_end ?? 0)
+                ?: (int) ($subscription->items->data[0]->current_period_end ?? 0);
+            $endsOn = $this->formatUnixTimestamp($endsAtUnix ?: null);
+            if ($this->shouldSkipEmail("cancel-scheduled:{$subscriptionId}:{$endsOn}", 24 * 30)) {
                 return;
             }
 
             $details = [
                 'Plan' => $planLabel,
                 'Status' => $this->formatStatus($status),
-                'Access Ends' => $periodEnd,
+                'Access Ends' => $endsOn,
             ];
             $html = $this->renderEmail(
                 $user,
@@ -304,7 +349,7 @@ class StripeWebhookEmailService
                 $this->manageBillingUrl(),
                 'Manage Billing'
             );
-            $this->sendMail($user, 'Cancellation scheduled', $html);
+            $this->sendCancellationEmail($user, $endsAtUnix > 0 ? \Illuminate\Support\Carbon::createFromTimestamp($endsAtUnix) : null, $html);
 
             return;
         }

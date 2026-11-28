@@ -9,6 +9,7 @@ use App\Models\Plan;
 use App\Models\PlanChange;
 use App\Models\SiteSetting;
 use App\Models\Subscription;
+use App\Models\SubscriptionCancellation;
 use App\Models\User;
 use App\Services\Billing\CardDecline;
 use App\Services\Billing\ExtraCredits;
@@ -916,17 +917,26 @@ class BillingController extends Controller
     public function cancel(Request $request, BillingLifecycleService $billingLifecycle)
     {
         $user = $request->user();
+        // Why they are leaving, from the cancel dialog: a reason is required, the note is not.
+        $answer = $request->validate([
+            'reason' => ['required', 'string', 'in:'.implode(',', SubscriptionCancellation::REASONS)],
+            'note' => ['nullable', 'string', 'max:'.SubscriptionCancellation::NOTE_MAX],
+        ]);
 
         $subscription = $this->currentDefaultSubscription($user);
         // A renewal still unpaid in its grace days: no paid period is left to run to
         // its end, so the subscription and the plan end now, as when the grace runs out.
         if ($this->cancelEndsNow($user, $subscription)) {
+            $record = $this->recordCancellation($user, $answer, true);
             if (! $billingLifecycle->cancelDuringGrace($user)) {
+                $record->delete();
+
                 return response()->json([
                     'ok' => false,
                     'message' => __('ui.backend.billing_cancel_failed'),
                 ], 422);
             }
+            $record->update(['cancelled_at' => now(), 'ends_at' => now()]);
 
             return response()->json([
                 'ok' => true,
@@ -942,7 +952,19 @@ class BillingController extends Controller
             ], 422);
         }
 
+        // Already set to end (a second press, or a second tab): nothing more to do, and no
+        // second reason is saved or second request sent to Stripe.
+        if ($subscription->onGracePeriod()) {
+            return response()->json([
+                'ok' => true,
+                'message' => __('ui.backend.billing_cancellation_scheduled'),
+            ]);
+        }
+
         $booked = $this->planChanges->scheduledFor($user);
+        // Saved before Stripe is told, so the email knows the reason whichever way it is sent
+        // (from here, or from Stripe's webhook, which can arrive first).
+        $record = $this->recordCancellation($user, $answer, false);
         try {
             // Cancelling ends the plan at the renewal: a lower plan waiting for it is moot.
             $this->planChanges->releaseScheduleFor($subscription, 'cancelled');
@@ -958,8 +980,13 @@ class BillingController extends Controller
             }
             $this->billingSyncService->syncIfStale($user, true);
             $subscription->refresh();
+            $record->update(['cancelled_at' => now(), 'ends_at' => $subscription->ends_at]);
             $this->stripeWebhookEmailService->sendCancellationScheduledForUser($user, $subscription);
         } catch (\Throwable $exception) {
+            // Not cancelled: nothing to keep (a cancelled one is marked before the email).
+            if ($record->cancelled_at === null) {
+                $record->delete();
+            }
             Log::warning('Unable to cancel Stripe subscription renewal.', [
                 'user_id' => $user->id,
                 'subscription_id' => $subscription->id,
@@ -1765,6 +1792,28 @@ class BillingController extends Controller
     {
         return $subscription !== null && ! $subscription->ended()
             && in_array(strtolower((string) $subscription->stripe_status), ['past_due', 'unpaid'], true);
+    }
+
+    /**
+     * The cancellation and the reason the member gave in the dialog (Billing → Cancellations).
+     * Marked cancelled once Stripe has it.
+     *
+     * @param  array{reason?: string|null, note?: string|null}  $answer
+     */
+    private function recordCancellation(User $user, array $answer, bool $endsNow): SubscriptionCancellation
+    {
+        $plan = Subscription::query()->with('plan')->where('user_id', $user->id)->latest('id')->first()?->plan;
+        $note = trim((string) ($answer['note'] ?? ''));
+
+        return SubscriptionCancellation::create([
+            'user_id' => $user->id,
+            'plan_id' => $plan?->id,
+            'plan_name' => $plan?->name,
+            'reason' => ($answer['reason'] ?? null) ?: null,
+            'note' => $note !== '' ? $note : null,
+            'locale' => app()->getLocale(),
+            'ended_now' => $endsNow,
+        ]);
     }
 
     /**

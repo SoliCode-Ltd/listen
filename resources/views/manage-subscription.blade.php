@@ -217,6 +217,61 @@
       opacity: .82;
       pointer-events: none;
     }
+    /* The cancel dialog, in the same quiet style as the extra-credits dialog. */
+    .cx {
+      width: min(460px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); padding: 0; margin: auto;
+      border: 1px solid var(--line); border-radius: 20px; background: var(--surface); color: var(--text);
+      box-shadow: 0 24px 60px rgba(17, 15, 26, .22); overflow: hidden auto; overscroll-behavior: contain;
+    }
+    html[data-theme="dark"] .cx, html:not([data-theme]) .cx { box-shadow: 0 30px 80px -20px rgba(0, 0, 0, .7); }
+    .cx::backdrop { background: rgba(17, 15, 26, .46); }
+    .cx[open] { animation: cx-in .26s cubic-bezier(.2, .8, .2, 1); }
+    .cx[open]::backdrop { animation: cx-fade .22s ease; }
+    .cx.is-closing { animation: cx-out .2s ease forwards; }
+    .cx.is-closing::backdrop { animation: cx-fade .2s ease reverse forwards; }
+    @keyframes cx-in { from { opacity: 0; transform: translateY(8px) scale(.97); } }
+    @keyframes cx-out { to { opacity: 0; transform: scale(.98); } }
+    @keyframes cx-fade { from { opacity: 0; } }
+    @media (prefers-reduced-motion: reduce) { .cx[open], .cx[open]::backdrop, .cx.is-closing, .cx.is-closing::backdrop { animation: none; } }
+    .cx-body { padding: 22px 22px 20px; margin: 0; }
+    .cx-title { margin: 0; font-size: 1.19rem; font-weight: 700; line-height: 1.4; }
+    .cx-lead { margin: 8px 0 0; font-size: .92rem; line-height: 1.75; color: var(--muted); }
+    .cx-reasons { margin: 18px 0 0; padding: 0; border: 0; display: grid; gap: 6px; }
+    .cx-reasons legend, .cx-note > span { padding: 0; margin: 0 0 8px; font-size: .92rem; font-weight: 600; color: var(--text); }
+    .cx-reasons legend span, .cx-note em { margin-inline-start: 6px; font-size: .8rem; font-weight: 500; font-style: normal; color: var(--muted); }
+    .cx-reason {
+      display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 10px 14px;
+      border: 1px solid var(--line-strong, var(--line)); border-radius: 11px; cursor: pointer;
+      font-size: .94rem; line-height: 1.45; -webkit-tap-highlight-color: transparent;
+      transition: border-color .2s ease-out, background-color .15s ease-out;
+    }
+    .cx-reason input { flex: none; width: 17px; height: 17px; margin: 0; accent-color: var(--brand-accent, #7659FA); }
+    .cx-reason:has(input:checked) { border-color: var(--brand-accent, #7659FA); background: color-mix(in oklab, var(--brand-accent, #7659FA) 9%, transparent); }
+    .cx-reason:has(input:focus-visible) { outline: 2px solid var(--brand-accent, #7659FA); outline-offset: 2px; }
+    @media (hover: hover) { .cx-reason:not(:has(input:checked)):hover { background: var(--surface2); } }
+    /* "Choose a reason": the space opens smoothly (no jump in the dialog's height), the words
+       fade in, and the choices are outlined and nudged once so the eye goes to them. */
+    .cx-error-wrap { display: grid; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows .24s cubic-bezier(.2, .8, .2, 1), opacity .2s ease; }
+    .cx-error-wrap > .cx-error { overflow: hidden; min-height: 0; }
+    .cx-reasons.is-missing .cx-error-wrap { grid-template-rows: 1fr; opacity: 1; }
+    .cx-error { margin: 0; padding-top: 4px; font-size: .86rem; font-weight: 600; color: color-mix(in oklab, var(--danger) 85%, var(--text)); }
+    .cx-reasons.is-missing .cx-reason { border-color: color-mix(in oklab, var(--danger) 55%, var(--line)); }
+    .cx-reasons.is-nudged { animation: cx-nudge .36s cubic-bezier(.36, .07, .19, .97); }
+    @keyframes cx-nudge { 20% { transform: translateX(-5px); } 45% { transform: translateX(4px); } 70% { transform: translateX(-2px); } 100% { transform: none; } }
+    @media (prefers-reduced-motion: reduce) { .cx-error-wrap { transition: none; } .cx-reasons.is-nudged { animation: none; } }
+
+    .cx-note { display: block; margin-top: 16px; }
+    .cx-note > span { display: block; }
+    .cx-note textarea {
+      display: block; width: 100%; box-sizing: border-box; min-height: 76px; padding: 10px 12px; resize: vertical;
+      border: 1px solid var(--line-strong, var(--line)); border-radius: 11px; background: transparent; color: var(--text);
+      font: inherit; font-size: .94rem; line-height: 1.6;
+    }
+    .cx-note textarea:focus { outline: 2px solid var(--brand-accent, #7659FA); outline-offset: 1px; border-color: transparent; }
+    .cx-btns { margin-top: 20px; display: flex; flex-wrap: wrap; gap: 10px; }
+    /* Side by side when both labels fit on one line, one above the other when not. */
+    .cx-btns .btn { flex: 1 1 auto; justify-content: center; white-space: nowrap; }
+    @media (max-width: 420px) { .cx-btns { flex-direction: column; } }
     .message {
       margin-top: .85rem;
       padding: .85rem 1rem;
@@ -745,6 +800,43 @@
     </div>
   </main>
 
+  @if($hasCancelableSubscription)
+    {{-- Cancelling: what happens, then why (Billing → Cancellations). A reason is required to
+         cancel; the note is optional. "Keep my plan" is always one tap away. --}}
+    <dialog class="cx" id="cancelDialog" aria-labelledby="cancelDialogTitle">
+      <form method="dialog" class="cx-body" id="cancelForm">
+        <h2 class="cx-title" id="cancelDialogTitle">{{ __('ui.manage_subscription.cancel_dialog_title') }}</h2>
+        <p class="cx-lead">{{ !empty($cancelEndsNow)
+            ? __('ui.manage_subscription.confirm_cancel_unpaid_prompt')
+            : ($subscriptionRenewsAt
+                ? __('ui.manage_subscription.cancel_dialog_lead', ['date' => $subscriptionRenewsAt])
+                : __('ui.manage_subscription.cancel_dialog_lead_no_date')) }}</p>
+
+        <fieldset class="cx-reasons">
+          <legend>{{ __('ui.manage_subscription.cancel_reason_question') }}</legend>
+          @foreach(\App\Models\SubscriptionCancellation::REASONS as $reason)
+            <label class="cx-reason">
+              <input type="radio" name="reason" value="{{ $reason }}" required aria-describedby="cancelReasonError">
+              <span>{{ __('ui.manage_subscription.cancel_reasons.'.$reason) }}</span>
+            </label>
+          @endforeach
+          {{-- Opens smoothly when Cancel is pressed without a reason; its words are put in then, so it is read out. --}}
+          <div class="cx-error-wrap"><p class="cx-error" id="cancelReasonError" role="alert" data-text="{{ __('ui.manage_subscription.cancel_reason_required') }}"></p></div>
+        </fieldset>
+
+        <label class="cx-note">
+          <span>{{ __('ui.manage_subscription.cancel_note_label') }} <em>{{ __('ui.manage_subscription.cancel_reason_optional') }}</em></span>
+          <textarea name="note" rows="3" maxlength="{{ \App\Models\SubscriptionCancellation::NOTE_MAX }}" placeholder="{{ __('ui.manage_subscription.cancel_note_placeholder') }}"></textarea>
+        </label>
+
+        <div class="cx-btns">
+          <button class="btn btn-primary" type="submit" value="keep" formnovalidate autofocus>{{ __('ui.manage_subscription.cancel_keep') }}</button>
+          <button class="btn btn-danger" type="button" id="cancelConfirmBtn">{{ __('ui.manage_subscription.cancel_confirm') }}</button>
+        </div>
+      </form>
+    </dialog>
+  @endif
+
   @include('components.footer')
   @include('components.scripts')
   @php
@@ -982,14 +1074,86 @@
       : null;
     cardWallet?.show(true);
 
-    cancelBtn?.addEventListener('click', async () => {
-      // In a failed renewal's grace days the button has its own prompt: the plan ends now.
-      if (!window.confirm(cancelBtn.dataset.confirm || i18n.confirm_cancel_prompt)) return;
+    // The cancel dialog: what happens and, if they want to say, why. "Keep my plan", Escape or a
+    // click outside closes it with nothing changed.
+    const cancelDialog = document.getElementById('cancelDialog');
+    const cancelForm = document.getElementById('cancelForm');
+    const cancelConfirmBtn = document.getElementById('cancelConfirmBtn');
+    let cancelCloseTimer = null;
+    const finishClose = () => {
+      cancelCloseTimer = null;
+      cancelDialog.classList.remove('is-closing');
+      if (cancelDialog.open) cancelDialog.close();
+    };
+    const closeCancelDialog = () => {
+      if (!cancelDialog?.open || cancelCloseTimer) return;
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { finishClose(); return; }
+      cancelDialog.classList.add('is-closing');
+      cancelCloseTimer = setTimeout(finishClose, 190);
+    };
+    const openCancelDialog = () => {
+      // Opened again while it was still closing: finish that first, so the old timer cannot shut the new one.
+      if (cancelCloseTimer) { clearTimeout(cancelCloseTimer); finishClose(); }
+      if (typeof cancelDialog.showModal === 'function') cancelDialog.showModal();
+      else cancelDialog.setAttribute('open', '');
+    };
+
+    cancelForm?.addEventListener('submit', (event) => { event.preventDefault(); closeCancelDialog(); });
+    cancelDialog?.addEventListener('cancel', (event) => { event.preventDefault(); closeCancelDialog(); });
+    cancelDialog?.addEventListener('click', (event) => { if (event.target === cancelDialog) closeCancelDialog(); });
+
+    const cancelReasons = cancelForm?.querySelector('.cx-reasons');
+    const cancelReasonError = document.getElementById('cancelReasonError');
+    const showReasonMissing = (missing) => {
+      cancelReasons?.classList.toggle('is-missing', missing);
+      // The words stay while the space eases shut (taking them out at once would snap it closed);
+      // they are written again each time it opens, so a screen reader reads them out again.
+      if (missing && cancelReasonError) {
+        cancelReasonError.textContent = '';
+        requestAnimationFrame(() => { cancelReasonError.textContent = cancelReasonError.dataset.text; });
+      }
+      if (missing && cancelReasons) {
+        // The nudge plays again on each press.
+        cancelReasons.classList.remove('is-nudged');
+        void cancelReasons.offsetWidth;
+        cancelReasons.classList.add('is-nudged');
+      }
+    };
+    cancelReasons?.addEventListener('animationend', () => cancelReasons.classList.remove('is-nudged'));
+    cancelForm?.addEventListener('change', (event) => { if (event.target?.name === 'reason') showReasonMissing(false); });
+
+    cancelBtn?.addEventListener('click', () => {
+      if (!cancelDialog) return;
+      showReasonMissing(false);
+      openCancelDialog();
+    });
+
+    // One cancellation per press: a second click while it is on its way (or while the dialog is
+    // still closing) does nothing. An error lets them try again.
+    let cancelInFlight = false;
+    cancelConfirmBtn?.addEventListener('click', () => {
+      if (cancelInFlight) return;
+      const data = new FormData(cancelForm);
+      const reason = data.get('reason');
+      // A reason is required: say so, and take them to the first choice.
+      if (!reason) {
+        showReasonMissing(true);
+        cancelForm.querySelector('input[name="reason"]')?.focus();
+        return;
+      }
+      const answer = { reason, note: String(data.get('note') || '').trim() || null };
+      cancelInFlight = true;
+      cancelConfirmBtn.disabled = true;
+      closeCancelDialog();
+      cancelSubscription(answer);
+    });
+
+    async function cancelSubscription(answer) {
       setButtonBusy(cancelBtn, true, i18n.canceling, cancelBtnDefaultText);
       setMessage(subscriptionMessageBox, '', '');
 
       try {
-        const response = await post('{{ route('billing.cancel') }}');
+        const response = await post('{{ route('billing.cancel') }}', answer);
         if (!response.ok || response.data?.ok === false) {
           throw new Error(response.data?.message || i18n.cancellation_failed);
         }
@@ -1010,10 +1174,12 @@
         setTimeout(() => window.location.reload(), 1500);
       } catch (error) {
         setMessage(subscriptionMessageBox, 'error', normalizeStripeMessage(error?.message, i18n.cancellation_failed));
+        cancelInFlight = false;
+        if (cancelConfirmBtn) cancelConfirmBtn.disabled = false;
       } finally {
         setButtonBusy(cancelBtn, false, '', cancelBtnDefaultText);
       }
-    });
+    }
 
     // "Keep my plan": the lower plan waiting for the renewal is called off.
     const keepPlanBtn = document.getElementById('keepPlanBtn');

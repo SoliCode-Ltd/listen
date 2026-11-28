@@ -100,8 +100,13 @@ class BillingEmailsTest extends TestCase
             foreach (['cus_mail', 'sub_gone', 'sub_grace', 'in_paid', 'cs_pack', 'ch_refund'] as $id) {
                 $this->assertStringNotContainsString($id, $html);
             }
-            $this->assertStringContainsString('<html lang="en" dir="ltr">', $html);
+            // The cancellation email is in both languages, in the newsletter design (CancellationEmail);
+            // the plain notices are English, left to right.
+            if (! str_contains($html, 'Keep my plan')) {
+                $this->assertStringContainsString('<html lang="en" dir="ltr">', $html);
+            }
         }
+        $this->assertSame(1, $sent->filter(fn (string $html): bool => str_contains($html, 'Keep my plan'))->count());
         $this->assertTrue($sent->contains(fn (string $html): bool => str_contains($html, 'Your billing profile was removed.')));
     }
 

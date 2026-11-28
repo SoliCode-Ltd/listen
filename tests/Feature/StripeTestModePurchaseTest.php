@@ -486,7 +486,7 @@ class StripeTestModePurchaseTest extends TestCase
 
         // Booked again, then cancelled: the schedule goes first and the renewal is turned off.
         $this->postJsonLocalizedRoute('billing.subscribe', ['plan' => 'starter', 'billing_cycle' => 'monthly'])->assertOk();
-        $this->postJsonLocalizedRoute('billing.cancel', [])->assertOk();
+        $this->postJsonLocalizedRoute('billing.cancel', ['reason' => 'not_needed'])->assertOk();
         $cancelled = Cashier::stripe()->subscriptions->retrieve($subscriptionId, []);
         $this->assertEmpty($cancelled->schedule);
         $this->assertTrue((bool) $cancelled->cancel_at_period_end);
