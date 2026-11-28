@@ -1128,7 +1128,11 @@
       openCancelDialog();
     });
 
+    // One cancellation per press: a second click while it is on its way (or while the dialog is
+    // still closing) does nothing. An error lets them try again.
+    let cancelInFlight = false;
     cancelConfirmBtn?.addEventListener('click', () => {
+      if (cancelInFlight) return;
       const data = new FormData(cancelForm);
       const reason = data.get('reason');
       // A reason is required: say so, and take them to the first choice.
@@ -1138,6 +1142,8 @@
         return;
       }
       const answer = { reason, note: String(data.get('note') || '').trim() || null };
+      cancelInFlight = true;
+      cancelConfirmBtn.disabled = true;
       closeCancelDialog();
       cancelSubscription(answer);
     });
@@ -1168,6 +1174,8 @@
         setTimeout(() => window.location.reload(), 1500);
       } catch (error) {
         setMessage(subscriptionMessageBox, 'error', normalizeStripeMessage(error?.message, i18n.cancellation_failed));
+        cancelInFlight = false;
+        if (cancelConfirmBtn) cancelConfirmBtn.disabled = false;
       } finally {
         setButtonBusy(cancelBtn, false, '', cancelBtnDefaultText);
       }

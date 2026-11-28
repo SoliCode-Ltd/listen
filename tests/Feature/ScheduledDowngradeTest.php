@@ -1111,6 +1111,20 @@ class ScheduledDowngradeTest extends TestCase
         $this->assertNotNull($record->cancelled_at);
     }
 
+    public function test_pressing_cancel_twice_cancels_once_and_keeps_one_reason(): void
+    {
+        $user = $this->cardMember();
+        $send = fn () => $this->actingAs($user)->withoutMiddleware($this->without())
+            ->postJson($this->localizedRoute('billing.cancel'), ['reason' => 'price'])->assertOk()->assertJsonPath('ok', true);
+
+        $send();
+        $before = count($this->stripe->requests);
+        $send();
+
+        $this->assertSame(1, SubscriptionCancellation::query()->count());
+        $this->assertSame($before, count($this->stripe->requests), 'The second press asks Stripe nothing.');
+    }
+
     public function test_an_unknown_reason_is_refused_and_nothing_is_cancelled(): void
     {
         $user = $this->cardMember();

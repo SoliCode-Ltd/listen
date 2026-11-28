@@ -952,6 +952,15 @@ class BillingController extends Controller
             ], 422);
         }
 
+        // Already set to end (a second press, or a second tab): nothing more to do, and no
+        // second reason is saved or second request sent to Stripe.
+        if ($subscription->onGracePeriod()) {
+            return response()->json([
+                'ok' => true,
+                'message' => __('ui.backend.billing_cancellation_scheduled'),
+            ]);
+        }
+
         $booked = $this->planChanges->scheduledFor($user);
         // Saved before Stripe is told, so the email knows the reason whichever way it is sent
         // (from here, or from Stripe's webhook, which can arrive first).
