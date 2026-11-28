@@ -7,6 +7,7 @@ use App\Models\PlanChange;
 use App\Models\Subscription;
 use App\Models\User;
 use App\Services\Billing\BillingLifecycleMail;
+use App\Services\Billing\CancellationLog;
 use App\Services\Billing\PlanChangeEmails;
 use App\Services\Billing\PlanChanges;
 use App\Services\Billing\RenewalGrace;
@@ -503,6 +504,8 @@ class BillingLifecycleService
             // Without proration: the period this cuts short was never paid, so it
             // must leave no credit for unused time (a later subscription would get
             // it as a discount). Cashier prorates by default.
+            // The site ends it, not the member: Billing → Cancellations does not count it.
+            CancellationLog::siteEnds((string) $billingSubscription->stripe_id);
             $billingSubscription->noProrate()->cancelNow();
 
             return true;

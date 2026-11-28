@@ -1111,6 +1111,24 @@ class ScheduledDowngradeTest extends TestCase
         $this->assertNotNull($record->cancelled_at);
     }
 
+    public function test_a_cancellation_is_tied_to_its_stripe_subscription_and_keeping_the_plan_takes_it_out_of_the_count(): void
+    {
+        $user = $this->cardMember();
+        $this->actingAs($user)->withoutMiddleware($this->without())
+            ->postJson($this->localizedRoute('billing.cancel'), ['reason' => 'price'])->assertOk();
+
+        $row = SubscriptionCancellation::query()->sole();
+        $this->assertSame('sub_dn', $row->stripe_subscription_id);
+        $this->assertSame(SubscriptionCancellation::SOURCE_SITE, $row->source);
+        $this->assertSame(1, SubscriptionCancellation::query()->counted()->count());
+
+        $this->actingAs($user)->withoutMiddleware($this->without())
+            ->postJson($this->localizedRoute('billing.resume'))->assertOk()->assertJsonPath('ok', true);
+
+        $this->assertNotNull($row->fresh()->resumed_at);
+        $this->assertSame(0, SubscriptionCancellation::query()->counted()->count());
+    }
+
     public function test_pressing_cancel_twice_cancels_once_and_keeps_one_reason(): void
     {
         $user = $this->cardMember();
