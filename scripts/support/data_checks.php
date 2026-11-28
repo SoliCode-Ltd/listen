@@ -1,26 +1,49 @@
 <?php
 
 /*
- * One-off, read-only: which migrations are pending on this server (files on the server
- * that its database has not recorded), before running "migrate". Nothing written.
+ * One-off, read-only, after deploying solicode-ltd/listen#419: the cancellations table is
+ * there, and the log since the deploy has no error from the cancel flow. Prints log lines
+ * only when they match the cancel flow or are errors, cut short, never secrets.
  */
 require 'vendor/autoload.php';
 $app = require 'bootstrap/app.php';
 $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 if (in_array(DB::connection()->getDriverName(), ['mysql', 'mariadb'], true)) {
     DB::statement('SET SESSION TRANSACTION READ ONLY');
 }
-$ran = DB::table('migrations')->pluck('migration')->all();
-$files = array_map(fn ($f) => basename($f, '.php'), glob(database_path('migrations/*.php')) ?: []);
-$pending = array_values(array_diff($files, $ran));
-sort($pending);
 echo 'Now (UTC): ', now()->utc()->toDateTimeString(), "\n";
-echo 'migration files on the server: ', count($files), ' | recorded in the database: ', count($ran), "\n";
-echo "== pending (would run on migrate) ==\n";
-foreach ($pending as $m) { echo '  ', $m, "\n"; }
-echo $pending === [] ? "  none\n" : '';
-foreach (['2026_10_29_120000_give_abeer_a_lighter_voice', '2026_11_09_120000_open_voice_design_on_creator_pro_studio_max', '2026_11_26_030000_widen_google_avatar_on_users_table'] as $m) {
-    echo $m, ': ', in_array($m, $ran, true) ? 'already run' : 'NOT run', ' | file on server: ', in_array($m, $files, true) ? 'yes' : 'no', "\n";
+echo 'subscription_cancellations exists: ', Schema::hasTable('subscription_cancellations') ? 'yes' : 'NO', "\n";
+echo 'migration recorded: ', DB::table('migrations')->where('migration', '2026_12_14_090000_create_subscription_cancellations_table')->exists() ? 'yes' : 'NO', "\n";
+if (Schema::hasTable('subscription_cancellations')) {
+    echo 'cancellations recorded so far: ', DB::table('subscription_cancellations')->count(), ' (with cancelled_at: ', DB::table('subscription_cancellations')->whereNotNull('cancelled_at')->count(), ")\n";
+}
+echo 'cancel requests to Stripe since 08:53 UTC (subscriptions newly set to end): ', DB::table('billing_subscriptions')->where('updated_at', '>=', '2026-11-28 08:53:00')->whereNotNull('ends_at')->count(), "\n";
+$log = storage_path('logs/laravel.log');
+echo "== log since 2026-11-28 08:53 UTC: errors, and anything from the cancel flow ==\n";
+if (! is_file($log)) {
+    echo "  no laravel.log\n";
+} else {
+    $size = filesize($log);
+    $fh = fopen($log, 'r');
+    fseek($fh, max(0, $size - 3000000));
+    $chunk = stream_get_contents($fh);
+    fclose($fh);
+    $shown = 0; $errors = 0;
+    foreach (preg_split('/\r?\n/', (string) $chunk) as $line) {
+        if (! preg_match('/^\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\]/', $line, $m) || $m[1] < '2026-11-28 08:53:00') {
+            continue;
+        }
+        $isError = preg_match('/\.(ERROR|CRITICAL|ALERT|EMERGENCY):/', $line);
+        $isCancel = preg_match('/SubscriptionCancellation|subscription_cancellations|CancellationEmail|cancellation email|billing\/cancel|cancel Stripe subscription|manage-subscription/i', $line);
+        $errors += $isError ? 1 : 0;
+        if (($isError || $isCancel) && $shown < 25) {
+            $line = preg_replace('/(password|secret|token|key)[^,}]{0,80}/i', '$1=[hidden]', $line);
+            echo '  ', mb_substr($line, 0, 260), "\n";
+            $shown++;
+        }
+    }
+    echo '  errors since the deploy: ', $errors, "\n";
 }
