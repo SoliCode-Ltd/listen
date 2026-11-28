@@ -133,8 +133,8 @@ class StripeWebhookEmailService
 
     /**
      * The cancellation email (Newsletter → Cancellation): in both languages, in the site's
-     * email design, asking why they cancelled or thanking them when they already said in
-     * the cancel dialog. Switched off there, the plain notice ($plainHtml) goes instead.
+     * email design, answering the reason the member chose in the cancel dialog (none when
+     * they cancelled in Stripe). Switched off there, the plain notice ($plainHtml) goes instead.
      */
     private function sendCancellationEmail(User $user, ?\DateTimeInterface $endsAt, string $plainHtml): void
     {
@@ -149,7 +149,7 @@ class StripeWebhookEmailService
         $plan = Subscription::query()->with('plan')->where('user_id', $user->id)->latest('id')->first()?->plan;
 
         try {
-            $email->send($user, $plan, $endsAt, $record !== null && ($record->reason !== null || $record->note !== null));
+            $email->send($user, $plan, $endsAt, $record?->reason);
         } catch (\Throwable $exception) {
             // Not sent (or not the live site): its "already sent" key is let go, so a retry can send it.
             Log::warning('Unable to send the cancellation email.', [

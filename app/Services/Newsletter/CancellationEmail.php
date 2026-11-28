@@ -3,9 +3,11 @@
 namespace App\Services\Newsletter;
 
 use App\Mail\CancellationMail;
+use App\Models\BillingSubscription;
 use App\Models\Newsletter;
 use App\Models\Plan;
 use App\Models\SiteSetting;
+use App\Models\SubscriptionCancellation;
 use App\Models\User;
 use App\Support\LiveServer;
 use App\Support\TitanMailbox;
@@ -17,8 +19,11 @@ use RuntimeException;
 /**
  * The email a member gets the moment they cancel their subscription: it will not renew,
  * nothing more is charged, the plan stays on until its end date, and a button to keep
- * it. Then it asks why they cancelled (reply with a number), or, when they already
- * said in the cancel dialog, thanks them for it.
+ * it. Between the two, a paragraph that answers the reason they chose in the cancel
+ * dialog, with something real to stay for: a smaller plan or paying yearly when the
+ * price was the reason (only what their plan really offers), help choosing a voice,
+ * help with a problem, or simply the way back. A member who cancelled another way (in
+ * Stripe) gave no reason, and is asked to reply.
  *
  * In Arabic and English, in the newsletter's email design, from the help mailbox so
  * replies reach the team. Its words are edited in Newsletter → Cancellation.
@@ -42,10 +47,30 @@ class CancellationEmail
             'headline_ar' => 'تم إلغاء تجديد باقة {plan}',
             'body_en' => "Hi {name}, we've cancelled the renewal of your {plan} plan, as you asked. You won't be charged again, and your plan keeps all its features until {date}. After that, your account moves to the free plan.",
             'body_ar' => 'أهلاً {name}، ألغينا تجديد اشتراكك في باقة {plan} كما طلبت. لن يُخصم منك أي مبلغ بعد الآن، وتبقى باقتك بكل مزاياها حتى {date}، ثم ينتقل حسابك إلى الباقة المجانية.',
-            'ask_en' => "We'd like to know why you cancelled. It helps us make Listen better. Just reply to this email with a number:\n\n**1.** The price didn't suit me\n**2.** The voices or dialects weren't what I expected\n**3.** I had a technical problem\n**4.** I don't need it right now\n**5.** Something else (tell us)\n\nWe read every reply ourselves, and if there's a problem we can fix, we'll help right away.",
-            'ask_ar' => "ويهمّنا أن نعرف سبب الإلغاء، فرأيك يساعدنا على تحسين إسمع. يكفي أن تردّ على هذه الرسالة برقم:\n\n**1.** السعر لم يكن مناسبًا\n**2.** جودة الأصوات أو اللهجات لم تكن كما توقعت\n**3.** واجهت مشكلة تقنية\n**4.** لم أعد بحاجة إلى الخدمة الآن\n**5.** سبب آخر (اكتبه لنا)\n\nنقرأ كل ردّ بأنفسنا، وإن كانت هناك مشكلة يمكننا حلّها فسنساعدك فورًا.",
-            'thanks_en' => "Thank you for telling us why you cancelled. We read every answer ourselves. If something didn't work as it should, just reply to this email and we'll help right away.",
-            'thanks_ar' => 'شكرًا لأنك أخبرتنا بسبب الإلغاء، فنحن نقرأ كل إجابة بأنفسنا. وإن واجهت أي مشكلة، ردّ على هذه الرسالة وسنساعدك فورًا.',
+            // The paragraph for the reason the member chose (SubscriptionCancellation::REASONS).
+            // The price: an opening, then only what their plan really offers, then where to change it.
+            'reason_price_en' => "If the price was the reason, you may not need to leave to pay less.",
+            'reason_price_ar' => 'إذا كان السعر هو السبب، فقد لا تحتاج إلى المغادرة لتدفع أقل.',
+            'price_smaller_en' => 'You can move to a smaller plan with fewer credits a month.',
+            'price_smaller_ar' => 'يمكنك الانتقال إلى باقة أصغر برصيد شهري أقل.',
+            'price_yearly_en' => 'Paying yearly saves you {percent}% compared with paying monthly.',
+            'price_yearly_ar' => 'ويوفّر لك الدفع السنوي {percent}% مقارنةً بالدفع الشهري.',
+            'price_change_en' => 'You can change your plan any time before {date}, from Manage subscription.',
+            'price_change_ar' => 'ويمكنك تغيير باقتك في أي وقت قبل {date} من صفحة إدارة الاشتراك.',
+            // The price, when their plan has neither (the smallest plan, already paid yearly).
+            'price_fallback_en' => "Thank you for telling us. It helps us keep Listen within everyone's reach. If a plan or a price would work better for you, just reply to this email and tell us.",
+            'price_fallback_ar' => 'شكرًا لأنك أخبرتنا، فرأيك يساعدنا على أن يبقى إسمع في متناول الجميع. وإن كانت هناك باقة أو سعر يناسبك أكثر، ردّ على هذه الرسالة وأخبرنا.',
+            'reason_quality_en' => "If a voice didn't sound the way you wanted, there is still a lot to try: more than 200 dialects and accents, and for every voice you choose the emotion, the speaking style and the speed. Reply with the text you are working on and the dialect you need, and we'll suggest the voice that fits it best.",
+            'reason_quality_ar' => 'إذا لم يكن الصوت كما أردت، فما زال هناك الكثير لتجربه: أكثر من 200 لهجة ولكنة، ولكل صوت تختار الشعور وأسلوب الأداء والسرعة. ردّ على هذه الرسالة بالنص الذي تعمل عليه واللهجة التي تحتاجها، وسنقترح عليك الصوت الأنسب له.',
+            'reason_technical_en' => "We're sorry something didn't work as it should. Reply to this email and tell us what happened (a screenshot helps a lot): we read every message ourselves and we'll fix it with you. Your plan stays on until {date}, so you can keep using it while we do.",
+            'reason_technical_ar' => 'نأسف لأن شيئًا لم يعمل كما ينبغي. ردّ على هذه الرسالة وأخبرنا بما حدث (وصورة الشاشة تساعدنا كثيرًا)، فنحن نقرأ كل رسالة بأنفسنا وسنحلّ المشكلة معك. وتبقى باقتك مفعّلة حتى {date}، فيمكنك الاستمرار في استخدامها حتى نحلّها.',
+            'reason_not_needed_en' => "That's fine: you can come back whenever you need a voice-over again. Until {date} your plan keeps all its features, so it's a good time to make anything you have planned.",
+            'reason_not_needed_ar' => 'لا بأس، يمكنك العودة متى احتجت إلى تعليق صوتي من جديد. وحتى {date} تبقى باقتك بكل مزاياها، فهو وقت مناسب لإنجاز ما خططت له.',
+            'reason_other_en' => "Thank you for telling us. If you'd like to say more, just reply to this email: we read every message ourselves.",
+            'reason_other_ar' => 'شكرًا لأنك أخبرتنا. وإن أردت أن تضيف شيئًا، يكفي أن تردّ على هذه الرسالة، فنحن نقرأ كل رسالة بأنفسنا.',
+            // Cancelled another way (in Stripe), with no reason given.
+            'reason_none_en' => "If something wasn't what you hoped for, reply to this email and tell us: we read every message ourselves, and we'll help right away.",
+            'reason_none_ar' => 'إذا لم يكن شيء كما توقعت، ردّ على هذه الرسالة وأخبرنا، فنحن نقرأ كل رسالة بأنفسنا وسنساعدك فورًا.',
             'keep_en' => 'Changed your mind? You can turn renewal back on any time before {date}:',
             'keep_ar' => 'إذا غيّرت رأيك قبل {date}، يمكنك إعادة تفعيل التجديد بضغطة واحدة:',
             'cta_label_en' => 'Keep my plan',
@@ -88,12 +113,13 @@ class CancellationEmail
     }
 
     /**
-     * Sends the email for a plan that ends at $endsAt. $reasonGiven: the member already
-     * said why in the cancel dialog, so it thanks them instead of asking. With $testTo it
-     * goes to that address instead. Members are emailed from the live site only; a test
-     * copy can go anywhere. Throws when it could not be sent, so the caller can try again.
+     * Sends the email for a plan that ends at $endsAt. $reason is what the member chose in
+     * the cancel dialog (SubscriptionCancellation::REASONS), null when they cancelled another
+     * way. With $testTo it goes to that address instead. Members are emailed from the live
+     * site only; a test copy can go anywhere. Throws when it could not be sent, so the caller
+     * can try again.
      */
-    public function send(User $user, ?Plan $plan, \DateTimeInterface $endsAt, bool $reasonGiven, ?string $testTo = null): void
+    public function send(User $user, ?Plan $plan, \DateTimeInterface $endsAt, ?string $reason, ?string $testTo = null): void
     {
         if ($testTo === null && ! LiveServer::allowsCustomerActions()) {
             LiveServer::skipped('cancellation email', ['user_id' => $user->id]);
@@ -109,7 +135,7 @@ class CancellationEmail
             throw new InvalidArgumentException('This member signed up with a phone number, so there is no email address to send to.');
         }
 
-        $newsletter = $this->asNewsletter($this->settings(), $plan, $endsAt, $reasonGiven, (string) $user->name);
+        $newsletter = $this->asNewsletter($this->settings(), $plan, $endsAt, $reason, $this->offersFor($user, $plan), (string) $user->name);
         $renderer = app(NewsletterRenderer::class);
         // A billing message, not a newsletter: no unsubscribe link, and the greeting is in the words.
         $recipient = ['name' => (string) $user->name, 'no_greeting' => true];
@@ -138,23 +164,78 @@ class CancellationEmail
     }
 
     /**
-     * The email shown in the admin preview, for a sample member whose plan ends in 20 days.
+     * What this member could really do instead of leaving when the price was the reason:
+     * a smaller paid plan exists below theirs, and paying yearly saves (their plan has a
+     * yearly price, the saving is set, and they pay monthly today).
+     *
+     * @return array{smaller: bool, yearly_percent: int|null}
+     */
+    public function offersFor(?User $user, ?Plan $plan): array
+    {
+        if ($plan === null) {
+            return ['smaller' => false, 'yearly_percent' => null];
+        }
+
+        $smaller = Plan::query()->subscriptionPlans()->where('is_active', true)
+            ->where('price_cents', '>', 0)->where('price_cents', '<', (int) $plan->price_cents)
+            ->exists();
+
+        $percent = SiteSetting::yearlyDiscountPercent();
+        $paysYearly = $user !== null && trim((string) $plan->stripe_price_yearly) !== ''
+            && BillingSubscription::query()->where('user_id', $user->id)->where('type', 'default')
+                ->latest('id')->value('stripe_price') === $plan->stripe_price_yearly;
+        $yearly = $percent > 0 && trim((string) $plan->stripe_price_yearly) !== '' && ! $paysYearly ? $percent : null;
+
+        return ['smaller' => $smaller, 'yearly_percent' => $yearly];
+    }
+
+    /**
+     * The email shown in the admin preview, for a sample member whose plan ends in 20 days,
+     * as it reads for $reason (null: cancelled in Stripe, no reason). The price paragraph
+     * shows every option, as for a member who has both.
      *
      * @param  array<string, string>|null  $settings
      */
-    public function previewHtml(?array $settings = null, bool $reasonGiven = false): string
+    public function previewHtml(?array $settings = null, ?string $reason = null): string
     {
         $settings ??= $this->settings();
         $sample = Plan::query()->subscriptionPlans()->where('is_active', true)->where('price_cents', '>', 0)->orderBy('price_cents')->first();
-        $newsletter = $this->asNewsletter($settings, $sample, now()->addDays(20), $reasonGiven, '');
+        $offers = ['smaller' => true, 'yearly_percent' => max(1, SiteSetting::yearlyDiscountPercent())];
+        $newsletter = $this->asNewsletter($settings, $sample, now()->addDays(20), $reason, $offers, '');
 
         return app(NewsletterRenderer::class)->html($newsletter, Newsletter::LANGUAGE_BOTH, ['preview' => true, 'no_greeting' => true]);
     }
 
     /**
+     * The paragraph answering the member's reason, in one language.
+     *
      * @param  array<string, string>  $settings
+     * @param  array{smaller: bool, yearly_percent: int|null}  $offers
      */
-    private function asNewsletter(array $settings, ?Plan $plan, \DateTimeInterface $endsAt, bool $reasonGiven, string $memberName): Newsletter
+    public static function reasonParagraph(array $settings, ?string $reason, array $offers, string $lang): string
+    {
+        $text = fn (string $key): string => trim((string) ($settings[$key.'_'.$lang] ?? ''));
+
+        if ($reason === 'price') {
+            $options = array_filter([
+                $offers['smaller'] ? $text('price_smaller') : '',
+                $offers['yearly_percent'] !== null ? str_replace('{percent}', (string) $offers['yearly_percent'], $text('price_yearly')) : '',
+            ]);
+            if ($options === []) {
+                return $text('price_fallback');
+            }
+
+            return implode(' ', array_filter([$text('reason_price'), ...$options, $text('price_change')]));
+        }
+
+        return $text('reason_'.(in_array($reason, SubscriptionCancellation::REASONS, true) ? $reason : 'none'));
+    }
+
+    /**
+     * @param  array<string, string>  $settings
+     * @param  array{smaller: bool, yearly_percent: int|null}  $offers
+     */
+    private function asNewsletter(array $settings, ?Plan $plan, \DateTimeInterface $endsAt, ?string $reason, array $offers, string $memberName): Newsletter
     {
         $fields = [
             'language' => Newsletter::LANGUAGE_BOTH,
@@ -177,11 +258,12 @@ class CancellationEmail
             foreach (['subject', 'headline', 'cta_label', 'footer'] as $field) {
                 $fields[$field.'_'.$lang] = $fill((string) ($settings[$field.'_'.$lang] ?? ''));
             }
-            // What happened, then the question (or the thanks), then the way back just above its button.
-            $fields['body_'.$lang] = implode("\n\n", array_filter(array_map(
-                fn (string $part): string => trim($fill((string) ($settings[$part.'_'.$lang] ?? ''))),
-                ['body', $reasonGiven ? 'thanks' : 'ask', 'keep']
-            )));
+            // What happened, then the answer to their reason, then the way back just above its button.
+            $fields['body_'.$lang] = implode("\n\n", array_filter(array_map('trim', [
+                $fill((string) ($settings['body_'.$lang] ?? '')),
+                $fill(self::reasonParagraph($settings, $reason, $offers, $lang)),
+                $fill((string) ($settings['keep_'.$lang] ?? '')),
+            ])));
             $fields['preheader_'.$lang] = $fields['headline_'.$lang];
             $fields['cta_url_'.$lang] = rtrim((string) config('app.url', ''), '/').'/'.$lang.'/manage-subscription';
         }

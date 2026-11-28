@@ -249,8 +249,17 @@
     .cx-reason:has(input:checked) { border-color: var(--brand-accent, #7659FA); background: color-mix(in oklab, var(--brand-accent, #7659FA) 9%, transparent); }
     .cx-reason:has(input:focus-visible) { outline: 2px solid var(--brand-accent, #7659FA); outline-offset: 2px; }
     @media (hover: hover) { .cx-reason:not(:has(input:checked)):hover { background: var(--surface2); } }
-    .cx-error { margin: 2px 0 0; font-size: .86rem; font-weight: 600; color: color-mix(in oklab, var(--danger) 85%, var(--text)); }
+    /* "Choose a reason": the space opens smoothly (no jump in the dialog's height), the words
+       fade in, and the choices are outlined and nudged once so the eye goes to them. */
+    .cx-error-wrap { display: grid; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows .24s cubic-bezier(.2, .8, .2, 1), opacity .2s ease; }
+    .cx-error-wrap > .cx-error { overflow: hidden; min-height: 0; }
+    .cx-reasons.is-missing .cx-error-wrap { grid-template-rows: 1fr; opacity: 1; }
+    .cx-error { margin: 0; padding-top: 4px; font-size: .86rem; font-weight: 600; color: color-mix(in oklab, var(--danger) 85%, var(--text)); }
     .cx-reasons.is-missing .cx-reason { border-color: color-mix(in oklab, var(--danger) 55%, var(--line)); }
+    .cx-reasons.is-nudged { animation: cx-nudge .36s cubic-bezier(.36, .07, .19, .97); }
+    @keyframes cx-nudge { 20% { transform: translateX(-5px); } 45% { transform: translateX(4px); } 70% { transform: translateX(-2px); } 100% { transform: none; } }
+    @media (prefers-reduced-motion: reduce) { .cx-error-wrap { transition: none; } .cx-reasons.is-nudged { animation: none; } }
+
     .cx-note { display: block; margin-top: 16px; }
     .cx-note > span { display: block; }
     .cx-note textarea {
@@ -811,7 +820,8 @@
               <span>{{ __('ui.manage_subscription.cancel_reasons.'.$reason) }}</span>
             </label>
           @endforeach
-          <p class="cx-error" id="cancelReasonError" role="alert" hidden>{{ __('ui.manage_subscription.cancel_reason_required') }}</p>
+          {{-- Opens smoothly when Cancel is pressed without a reason; its words are put in then, so it is read out. --}}
+          <div class="cx-error-wrap"><p class="cx-error" id="cancelReasonError" role="alert" data-text="{{ __('ui.manage_subscription.cancel_reason_required') }}"></p></div>
         </fieldset>
 
         <label class="cx-note">
@@ -1069,12 +1079,25 @@
     const cancelDialog = document.getElementById('cancelDialog');
     const cancelForm = document.getElementById('cancelForm');
     const cancelConfirmBtn = document.getElementById('cancelConfirmBtn');
-    const closeCancelDialog = () => {
-      if (!cancelDialog?.open) return;
-      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { cancelDialog.close(); return; }
-      cancelDialog.classList.add('is-closing');
-      setTimeout(() => { cancelDialog.classList.remove('is-closing'); cancelDialog.close(); }, 190);
+    let cancelCloseTimer = null;
+    const finishClose = () => {
+      cancelCloseTimer = null;
+      cancelDialog.classList.remove('is-closing');
+      if (cancelDialog.open) cancelDialog.close();
     };
+    const closeCancelDialog = () => {
+      if (!cancelDialog?.open || cancelCloseTimer) return;
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { finishClose(); return; }
+      cancelDialog.classList.add('is-closing');
+      cancelCloseTimer = setTimeout(finishClose, 190);
+    };
+    const openCancelDialog = () => {
+      // Opened again while it was still closing: finish that first, so the old timer cannot shut the new one.
+      if (cancelCloseTimer) { clearTimeout(cancelCloseTimer); finishClose(); }
+      if (typeof cancelDialog.showModal === 'function') cancelDialog.showModal();
+      else cancelDialog.setAttribute('open', '');
+    };
+
     cancelForm?.addEventListener('submit', (event) => { event.preventDefault(); closeCancelDialog(); });
     cancelDialog?.addEventListener('cancel', (event) => { event.preventDefault(); closeCancelDialog(); });
     cancelDialog?.addEventListener('click', (event) => { if (event.target === cancelDialog) closeCancelDialog(); });
@@ -1083,15 +1106,26 @@
     const cancelReasonError = document.getElementById('cancelReasonError');
     const showReasonMissing = (missing) => {
       cancelReasons?.classList.toggle('is-missing', missing);
-      if (cancelReasonError) cancelReasonError.hidden = !missing;
+      // The words stay while the space eases shut (taking them out at once would snap it closed);
+      // they are written again each time it opens, so a screen reader reads them out again.
+      if (missing && cancelReasonError) {
+        cancelReasonError.textContent = '';
+        requestAnimationFrame(() => { cancelReasonError.textContent = cancelReasonError.dataset.text; });
+      }
+      if (missing && cancelReasons) {
+        // The nudge plays again on each press.
+        cancelReasons.classList.remove('is-nudged');
+        void cancelReasons.offsetWidth;
+        cancelReasons.classList.add('is-nudged');
+      }
     };
+    cancelReasons?.addEventListener('animationend', () => cancelReasons.classList.remove('is-nudged'));
     cancelForm?.addEventListener('change', (event) => { if (event.target?.name === 'reason') showReasonMissing(false); });
 
     cancelBtn?.addEventListener('click', () => {
       if (!cancelDialog) return;
       showReasonMissing(false);
-      if (typeof cancelDialog.showModal === 'function') cancelDialog.showModal();
-      else cancelDialog.setAttribute('open', '');
+      openCancelDialog();
     });
 
     cancelConfirmBtn?.addEventListener('click', () => {

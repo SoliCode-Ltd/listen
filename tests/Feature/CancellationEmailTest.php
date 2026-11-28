@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\BillingSubscription;
 use App\Models\Plan;
+use App\Models\SiteSetting;
 use App\Models\Subscription;
 use App\Models\SubscriptionCancellation;
 use App\Models\User;
@@ -13,6 +14,7 @@ use App\Support\TitanMailbox;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Stripe\ApiRequestor;
 use Tests\Support\FakeStripePlanSyncClient;
 use Tests\TestCase;
@@ -58,7 +60,7 @@ class CancellationEmailTest extends TestCase
         parent::tearDown();
     }
 
-    public function test_a_member_who_cancels_gets_one_email_in_both_languages_asking_why(): void
+    public function test_a_member_who_cancels_gets_one_email_in_both_languages(): void
     {
         app(StripeWebhookEmailService::class)->sendCancellationScheduledForUser($this->member);
 
@@ -73,10 +75,12 @@ class CancellationEmailTest extends TestCase
         $this->assertStringContainsString('15 ديسمبر 2026', $html);
         $this->assertStringContainsString('Hi Sara, we&#039;ve cancelled the renewal of your Creator plan, as you asked.', $html);
         $this->assertStringContainsString('15 December 2026', $html);
-        // The question, with its numbered answers, and the way back.
-        $this->assertStringContainsString('يكفي أن تردّ على هذه الرسالة برقم:', $html);
-        $this->assertStringContainsString('Just reply to this email with a number:', $html);
-        $this->assertStringContainsString('السعر لم يكن مناسبًا', $html);
+        // No reason was given here (no cancel dialog): it invites a reply, and never repeats the dialog's list.
+        $this->assertStringContainsString('إذا لم يكن شيء كما توقعت، ردّ على هذه الرسالة وأخبرنا', $html);
+        $this->assertStringContainsString('reply to this email and tell us: we read every message ourselves', $html);
+        $this->assertStringNotContainsString('with a number', $html);
+        $this->assertStringNotContainsString('برقم', $html);
+        // The way back, in both languages.
         $this->assertStringContainsString('Keep my plan', $html);
         $this->assertStringContainsString('أبقِ اشتراكي', $html);
         $this->assertStringContainsString('/ar/manage-subscription', $html);
@@ -87,20 +91,56 @@ class CancellationEmailTest extends TestCase
         $this->assertStringNotContainsString('sub_cx', $html);
     }
 
-    public function test_a_member_who_gave_a_reason_is_thanked_instead_of_asked(): void
+    public function test_each_reason_gets_its_own_answer_with_something_to_stay_for(): void
     {
-        $record = SubscriptionCancellation::create([
-            'user_id' => $this->member->id, 'reason' => 'price', 'locale' => 'ar', 'cancelled_at' => now(), 'ends_at' => $this->endsAt,
-        ]);
+        $expect = [
+            'quality' => ['more than 200 dialects and accents', 'أكثر من 200 لهجة ولكنة'],
+            'technical' => ['a screenshot helps a lot', 'وصورة الشاشة تساعدنا كثيرًا'],
+            'not_needed' => ['you can come back whenever you need a voice-over again', 'يمكنك العودة متى احتجت إلى تعليق صوتي من جديد'],
+            'other' => ['If you&#039;d like to say more, just reply to this email', 'وإن أردت أن تضيف شيئًا'],
+        ];
+        foreach ($expect as $reason => [$en, $ar]) {
+            Cache::flush();
+            SubscriptionCancellation::query()->delete();
+            $record = SubscriptionCancellation::create([
+                'user_id' => $this->member->id, 'reason' => $reason, 'cancelled_at' => now(), 'ends_at' => $this->endsAt,
+            ]);
 
-        app(StripeWebhookEmailService::class)->sendCancellationScheduledForUser($this->member);
+            app(StripeWebhookEmailService::class)->sendCancellationScheduledForUser($this->member);
 
-        $html = (string) $this->sent()->sole()->getOriginalMessage()->getHtmlBody();
-        $this->assertStringContainsString('شكرًا لأنك أخبرتنا بسبب الإلغاء', $html);
-        $this->assertStringContainsString('Thank you for telling us why you cancelled.', $html);
-        $this->assertStringNotContainsString('with a number', $html);
-        $this->assertStringNotContainsString('برقم', $html);
-        $this->assertNotNull($record->fresh()->email_sent_at);
+            $html = (string) $this->sent()->last()->getOriginalMessage()->getHtmlBody();
+            $this->assertStringContainsString($en, $html, $reason);
+            $this->assertStringContainsString($ar, $html, $reason);
+            $this->assertStringNotContainsString('with a number', $html, $reason);
+            $this->assertNotNull($record->fresh()->email_sent_at, $reason);
+        }
+        $this->assertCount(4, $this->sent());
+    }
+
+    public function test_the_price_reason_offers_only_what_the_members_plan_really_has(): void
+    {
+        $creator = Plan::query()->where('slug', 'creator')->sole();
+        SubscriptionCancellation::create(['user_id' => $this->member->id, 'reason' => 'price', 'cancelled_at' => now(), 'ends_at' => $this->endsAt]);
+
+        // The smallest paid plan, with no yearly price: nothing to offer, so it thanks them and asks what would work.
+        $html = $this->sendAgain();
+        $this->assertStringContainsString('If a plan or a price would work better for you', $html);
+        $this->assertStringNotContainsString('smaller plan', $html);
+        $this->assertStringNotContainsString('Paying yearly', $html);
+
+        // A cheaper plan exists and theirs has a yearly price they don't pay yet: both, with the saving set in Billing settings.
+        Plan::factory()->create(['slug' => 'starter', 'name' => 'Starter', 'price_cents' => 900, 'is_active' => true]);
+        $creator->forceFill(['stripe_price_yearly' => 'price_creator_y'])->save();
+        SiteSetting::set('billing_yearly_discount_percentage', '20', 'billing');
+        $html = $this->sendAgain();
+        $this->assertStringContainsString('If the price was the reason, you may not need to leave to pay less. You can move to a smaller plan with fewer credits a month. Paying yearly saves you 20% compared with paying monthly. You can change your plan any time before 15 December 2026, from Manage subscription.', $html);
+        $this->assertStringContainsString('يمكنك الانتقال إلى باقة أصغر برصيد شهري أقل. ويوفّر لك الدفع السنوي 20% مقارنةً بالدفع الشهري.', $html);
+
+        // Already paying yearly: only the smaller plan.
+        BillingSubscription::query()->where('user_id', $this->member->id)->update(['stripe_price' => 'price_creator_y']);
+        $html = $this->sendAgain();
+        $this->assertStringContainsString('You can move to a smaller plan', $html);
+        $this->assertStringNotContainsString('Paying yearly', $html);
     }
 
     public function test_the_webhook_after_the_site_sends_nothing_more(): void
@@ -160,12 +200,13 @@ class CancellationEmailTest extends TestCase
         $this->assertCount(0, $this->sent());
     }
 
-    public function test_the_admin_preview_shows_both_versions(): void
+    public function test_the_admin_preview_shows_each_reason(): void
     {
         $email = app(CancellationEmail::class);
 
-        $this->assertStringContainsString('with a number', $email->previewHtml());
-        $this->assertStringContainsString('Thank you for telling us why', $email->previewHtml(null, true));
+        $this->assertStringContainsString('You can move to a smaller plan', $email->previewHtml(null, 'price'));
+        $this->assertStringContainsString('more than 200 dialects and accents', $email->previewHtml(null, 'quality'));
+        $this->assertStringContainsString('we read every message ourselves, and we&#039;ll help right away', $email->previewHtml(null, null));
     }
 
     public function test_the_admin_sees_the_reasons_and_edits_the_email(): void
@@ -189,10 +230,26 @@ class CancellationEmailTest extends TestCase
 
         \Livewire\Livewire::test(\App\Filament\Pages\CancellationEmailSettings::class)
             ->assertSee('Goes out by itself the moment a member cancels')
+            // A preview for each reason, and one for a cancellation in Stripe.
+            ->assertActionExists('preview_price')
+            ->assertActionExists('preview_quality')
+            ->assertActionExists('preview_technical')
+            ->assertActionExists('preview_not_needed')
+            ->assertActionExists('preview_other')
+            ->assertActionExists('preview_none')
             ->set('data.cta_label_en', 'Stay with Listen')
             ->call('save')
             ->assertHasNoErrors();
         $this->assertStringContainsString('Stay with Listen', app(CancellationEmail::class)->previewHtml());
+    }
+
+    /** Sends the email again, as for a new cancellation, and returns its html. */
+    private function sendAgain(): string
+    {
+        Cache::flush();
+        app(StripeWebhookEmailService::class)->sendCancellationScheduledForUser($this->member);
+
+        return (string) $this->sent()->last()->getOriginalMessage()->getHtmlBody();
     }
 
     private function sent(): Collection
