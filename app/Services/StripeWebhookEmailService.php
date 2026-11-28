@@ -4,9 +4,11 @@ namespace App\Services;
 
 use App\Models\BillingSubscription;
 use App\Models\SiteSetting;
+use App\Models\SubscriptionCancellation;
 use App\Models\Subscription;
 use App\Models\User;
 use App\Services\Billing\RenewalGrace;
+use App\Services\Newsletter\CancellationEmail;
 use App\Support\LiveServer;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -126,7 +128,41 @@ class StripeWebhookEmailService
             'Manage Billing'
         );
 
-        $this->sendMail($user, 'Cancellation scheduled', $html);
+        $this->sendCancellationEmail($user, $billingSubscription->ends_at, $html);
+    }
+
+    /**
+     * The cancellation email (Newsletter → Cancellation): in both languages, in the site's
+     * email design, asking why they cancelled or thanking them when they already said in
+     * the cancel dialog. Switched off there, the plain notice ($plainHtml) goes instead.
+     */
+    private function sendCancellationEmail(User $user, ?\DateTimeInterface $endsAt, string $plainHtml): void
+    {
+        $email = app(CancellationEmail::class);
+        if (! $email->enabled() || $endsAt === null) {
+            $this->sendMail($user, 'Cancellation scheduled', $plainHtml);
+
+            return;
+        }
+
+        $record = SubscriptionCancellation::recentFor($user);
+        $plan = Subscription::query()->with('plan')->where('user_id', $user->id)->latest('id')->first()?->plan;
+
+        try {
+            $email->send($user, $plan, $endsAt, $record !== null && ($record->reason !== null || $record->note !== null));
+        } catch (\Throwable $exception) {
+            // Not sent (or not the live site): its "already sent" key is let go, so a retry can send it.
+            Log::warning('Unable to send the cancellation email.', [
+                'user_id' => $user->id,
+                'error' => $exception->getMessage(),
+            ]);
+
+            return;
+        }
+
+        // Sent: from now on the same email is never sent again.
+        $this->pendingEmailKey = null;
+        $record?->update(['email_sent_at' => now()]);
     }
 
     private function handleCheckoutSessionCompleted(object $session): void
@@ -304,7 +340,8 @@ class StripeWebhookEmailService
                 $this->manageBillingUrl(),
                 'Manage Billing'
             );
-            $this->sendMail($user, 'Cancellation scheduled', $html);
+            $endsAtUnix = (int) ($subscription->cancel_at ?? 0) ?: (int) ($subscription->current_period_end ?? 0);
+            $this->sendCancellationEmail($user, $endsAtUnix > 0 ? \Illuminate\Support\Carbon::createFromTimestamp($endsAtUnix) : null, $html);
 
             return;
         }

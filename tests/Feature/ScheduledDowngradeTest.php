@@ -9,6 +9,7 @@ use App\Models\Plan;
 use App\Models\PlanChange;
 use App\Models\SiteSetting;
 use App\Models\Subscription;
+use App\Models\SubscriptionCancellation;
 use App\Models\User;
 use App\Services\Billing\PlanChanges;
 use App\Services\BillingSyncService;
@@ -1066,6 +1067,58 @@ class ScheduledDowngradeTest extends TestCase
         $this->stripe->subscription['status'] = 'canceled';
         app(PlanChanges::class)->reconcile($user, null);
         $this->assertSame('subscription_ended', PlanChange::query()->sole()->cancel_reason);
+    }
+
+    public function test_the_reason_chosen_in_the_cancel_dialog_is_kept_with_the_cancellation(): void
+    {
+        $user = $this->cardMember();
+
+        $this->actingAs($user)->withoutMiddleware($this->without())
+            ->postJson($this->localizedRoute('billing.cancel'), ['reason' => 'price', 'note' => '  Too expensive for me right now.  '])
+            ->assertOk()->assertJsonPath('ok', true);
+
+        $record = SubscriptionCancellation::query()->sole();
+        $this->assertSame($user->id, $record->user_id);
+        $this->assertSame('price', $record->reason);
+        $this->assertSame('Too expensive for me right now.', $record->note);
+        $this->assertNotNull($record->cancelled_at);
+        $this->assertNotNull($record->ends_at);
+        $this->assertFalse($record->ended_now);
+    }
+
+    public function test_a_member_can_cancel_without_giving_a_reason(): void
+    {
+        $user = $this->cardMember();
+
+        $this->actingAs($user)->withoutMiddleware($this->without())
+            ->postJson($this->localizedRoute('billing.cancel'))->assertOk()->assertJsonPath('ok', true);
+
+        $record = SubscriptionCancellation::query()->sole();
+        $this->assertNull($record->reason);
+        $this->assertNull($record->note);
+        $this->assertNotNull($record->cancelled_at);
+    }
+
+    public function test_an_unknown_reason_is_refused_and_nothing_is_cancelled(): void
+    {
+        $user = $this->cardMember();
+
+        $this->actingAs($user)->withoutMiddleware($this->without())
+            ->postJson($this->localizedRoute('billing.cancel'), ['reason' => 'because'])->assertStatus(422);
+
+        $this->assertSame(0, SubscriptionCancellation::query()->count());
+        $this->assertFalse($this->stripe->subscription['cancel_at_period_end']);
+    }
+
+    public function test_a_cancellation_stripe_refuses_leaves_no_reason_behind(): void
+    {
+        $user = $this->cardMember();
+        $this->stripe->failCancel = true;
+
+        $this->actingAs($user)->withoutMiddleware($this->without())
+            ->postJson($this->localizedRoute('billing.cancel'), ['reason' => 'technical'])->assertStatus(422);
+
+        $this->assertSame(0, SubscriptionCancellation::query()->count());
     }
 
     public function test_a_cancellation_that_fails_books_the_lower_plan_again(): void
