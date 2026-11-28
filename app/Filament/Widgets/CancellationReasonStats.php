@@ -28,10 +28,10 @@ class CancellationReasonStats extends BaseWidget
             Stat::make('Cancelled, last 90 days', (string) $total)
                 ->description(SubscriptionCancellation::query()->whereNotNull('cancelled_at')->where('cancelled_at', '>=', now()->subDays(30))->count().' in the last 30 days'),
         ];
-        // No reason given is counted under '' (a null key becomes '' in PHP).
-        foreach ([...SubscriptionCancellation::REASONS, ''] as $reason) {
+        // A reason is required in the cancel dialog, so every cancellation listed has one.
+        foreach (SubscriptionCancellation::REASONS as $reason) {
             $n = (int) ($counts[$reason] ?? 0);
-            $stats[] = Stat::make(SubscriptionCancellation::reasonLabel($reason === '' ? null : $reason), (string) $n)->description($share($n));
+            $stats[] = Stat::make(SubscriptionCancellation::reasonLabel($reason), (string) $n)->description($share($n));
         }
 
         return $stats;

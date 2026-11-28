@@ -73,7 +73,9 @@ class SubscriptionCancellationResource extends Resource
                         default => 'gray',
                     })
                     ->placeholder(SubscriptionCancellation::reasonLabel(null)),
-                TextColumn::make('note')->label('In their words')->wrap()->limit(160)->placeholder('—')->searchable(),
+                // Each note in its own direction: Arabic right to left, English left to right.
+                TextColumn::make('note')->label('In their words')->wrap()->limit(160)->placeholder('—')->searchable()
+                    ->extraAttributes(['dir' => 'auto']),
                 TextColumn::make('ends_at')->label('Plan ends')->date('j M Y')->placeholder('—')->sortable(),
                 IconColumn::make('ended_now')->label('Ended at once')->boolean()->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('locale')->label('Language')->badge()->toggleable(isToggledHiddenByDefault: true),
@@ -86,9 +88,6 @@ class SubscriptionCancellationResource extends Resource
                     ->options(collect(SubscriptionCancellation::REASONS)
                         ->mapWithKeys(fn (string $reason): array => [$reason => SubscriptionCancellation::reasonLabel($reason)])
                         ->all()),
-                Filter::make('no_reason')
-                    ->label('No reason given')
-                    ->query(fn (Builder $query): Builder => $query->whereNull('reason')),
                 Filter::make('with_note')
                     ->label('Wrote something')
                     ->query(fn (Builder $query): Builder => $query->whereNotNull('note')),
