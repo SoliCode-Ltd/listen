@@ -45,34 +45,35 @@ class CancellationEmail
             'subject_ar' => 'تم إلغاء تجديد باقة {plan}',
             'headline_en' => "Your {plan} plan won't renew",
             'headline_ar' => 'تم إلغاء تجديد باقة {plan}',
-            'body_en' => "Hi {name}, we've cancelled the renewal of your {plan} plan, as you asked. You won't be charged again, and your plan keeps all its features until {date}. After that, your account moves to the free plan.",
-            'body_ar' => 'أهلاً {name}، ألغينا تجديد اشتراكك في باقة {plan} كما طلبت. لن يُخصم منك أي مبلغ بعد الآن، وتبقى باقتك بكل مزاياها حتى {date}، ثم ينتقل حسابك إلى الباقة المجانية.',
-            // The paragraph for the reason the member chose (SubscriptionCancellation::REASONS).
-            // The price: an opening, then only what their plan really offers, then where to change it.
-            'reason_price_en' => "If the price was the reason, you may not need to leave to pay less.",
-            'reason_price_ar' => 'إذا كان السعر هو السبب، فقد لا تحتاج إلى المغادرة لتدفع أقل.',
-            'price_smaller_en' => 'You can move to a smaller plan with fewer credits a month.',
-            'price_smaller_ar' => 'يمكنك الانتقال إلى باقة أصغر برصيد شهري أقل.',
-            'price_yearly_en' => 'Paying yearly saves you {percent}% compared with paying monthly.',
-            'price_yearly_ar' => 'ويوفّر لك الدفع السنوي {percent}% مقارنةً بالدفع الشهري.',
-            'price_change_en' => 'You can change your plan any time before {date}, from Manage subscription.',
-            'price_change_ar' => 'ويمكنك تغيير باقتك في أي وقت قبل {date} من صفحة إدارة الاشتراك.',
+            // "## " starts a heading, lines starting "- " are a list, **words** are bold.
+            'body_en' => "Hi {name},\n\nWe've cancelled the renewal of your {plan} plan, as you asked.\n\n## What happens now\n- Your plan keeps all its features until **{date}**.\n- You won't be charged again.\n- After that, your account moves to the free plan.",
+            'body_ar' => "أهلاً {name}،\n\nألغينا تجديد اشتراكك في باقة {plan} كما طلبت.\n\n## ما الذي يحدث الآن\n- تبقى باقتك بكل مزاياها حتى **{date}**.\n- لن يُخصم منك أي مبلغ بعد الآن.\n- بعد ذلك ينتقل حسابك إلى الباقة المجانية.",
+            // The section for the reason the member chose (SubscriptionCancellation::REASONS).
+            // The price: a heading and opening, then a list of only what their plan really offers, then where to change it.
+            'reason_price_en' => "## Pay less, without leaving\nIf the price was the reason, another option may suit you better:",
+            'reason_price_ar' => "## ادفع أقل دون أن تغادر\nإذا كان السعر هو السبب، فقد يناسبك خيار آخر:",
+            'price_smaller_en' => '**A smaller plan**, with fewer credits a month.',
+            'price_smaller_ar' => '**باقة أصغر** برصيد شهري أقل.',
+            'price_yearly_en' => '**Yearly billing**, which saves you {percent}% compared with paying monthly.',
+            'price_yearly_ar' => '**الدفع السنوي**، ويوفّر لك {percent}% مقارنةً بالدفع الشهري.',
+            'price_change_en' => 'You can switch any time before {date}, from Manage subscription.',
+            'price_change_ar' => 'يمكنك التغيير في أي وقت قبل {date} من صفحة إدارة الاشتراك.',
             // The price, when their plan has neither (the smallest plan, already paid yearly).
-            'price_fallback_en' => "Thank you for telling us. It helps us keep Listen within everyone's reach. If a plan or a price would work better for you, just reply to this email and tell us.",
-            'price_fallback_ar' => 'شكرًا لأنك أخبرتنا، فرأيك يساعدنا على أن يبقى إسمع في متناول الجميع. وإن كانت هناك باقة أو سعر يناسبك أكثر، ردّ على هذه الرسالة وأخبرنا.',
-            'reason_quality_en' => "If a voice didn't sound the way you wanted, there is still a lot to try: more than 200 dialects and accents, and for every voice you choose the emotion, the speaking style and the speed. Reply with the text you are working on and the dialect you need, and we'll suggest the voice that fits it best.",
-            'reason_quality_ar' => 'إذا لم يكن الصوت كما أردت، فما زال هناك الكثير لتجربه: أكثر من 200 لهجة ولكنة، ولكل صوت تختار الشعور وأسلوب الأداء والسرعة. ردّ على هذه الرسالة بالنص الذي تعمل عليه واللهجة التي تحتاجها، وسنقترح عليك الصوت الأنسب له.',
-            'reason_technical_en' => "We're sorry something didn't work as it should. Reply to this email and tell us what happened (a screenshot helps a lot): we read every message ourselves and we'll fix it with you. Your plan stays on until {date}, so you can keep using it while we do.",
-            'reason_technical_ar' => 'نأسف لأن شيئًا لم يعمل كما ينبغي. ردّ على هذه الرسالة وأخبرنا بما حدث (وصورة الشاشة تساعدنا كثيرًا)، فنحن نقرأ كل رسالة بأنفسنا وسنحلّ المشكلة معك. وتبقى باقتك مفعّلة حتى {date}، فيمكنك الاستمرار في استخدامها حتى نحلّها.',
-            'reason_not_needed_en' => "That's fine: you can come back whenever you need a voice-over again. Until {date} your plan keeps all its features, so it's a good time to make anything you have planned.",
-            'reason_not_needed_ar' => 'لا بأس، يمكنك العودة متى احتجت إلى تعليق صوتي من جديد. وحتى {date} تبقى باقتك بكل مزاياها، فهو وقت مناسب لإنجاز ما خططت له.',
-            'reason_other_en' => "Thank you for telling us. If you'd like to say more, just reply to this email: we read every message ourselves.",
-            'reason_other_ar' => 'شكرًا لأنك أخبرتنا. وإن أردت أن تضيف شيئًا، يكفي أن تردّ على هذه الرسالة، فنحن نقرأ كل رسالة بأنفسنا.',
+            'price_fallback_en' => "## We're listening\nThank you for telling us. It helps us keep Listen within everyone's reach. If a plan or a price would work better for you, just reply to this email and tell us.",
+            'price_fallback_ar' => "## نحن نستمع إليك\nشكرًا لأنك أخبرتنا، فرأيك يساعدنا على أن يبقى إسمع في متناول الجميع. وإن كانت هناك باقة أو سعر يناسبك أكثر، ردّ على هذه الرسالة وأخبرنا.",
+            'reason_quality_en' => "## Before you go, try another voice\nIf a voice didn't sound the way you wanted, there is still a lot to try:\n\n- **More than 200 dialects and accents** in Arabic and English.\n- **Emotion, speaking style and speed**, chosen for every voice.\n\nReply with the text you are working on and the dialect you need, and we'll suggest the voice that fits it best.",
+            'reason_quality_ar' => "## قبل أن تغادر، جرّب صوتًا آخر\nإذا لم يكن الصوت كما أردت، فما زال هناك الكثير لتجربه:\n\n- **أكثر من 200 لهجة ولكنة** بالعربية والإنجليزية.\n- **الشعور وأسلوب الأداء والسرعة**، تختارها لكل صوت.\n\nردّ على هذه الرسالة بالنص الذي تعمل عليه واللهجة التي تحتاجها، وسنقترح عليك الصوت الأنسب له.",
+            'reason_technical_en' => "## Let us fix it\nWe're sorry something didn't work as it should. Reply to this email and tell us what happened; a screenshot helps a lot. We read every message ourselves, and we'll work it out with you.\n\nYour plan stays on until **{date}**, so you can keep using it in the meantime.",
+            'reason_technical_ar' => "## دعنا نحلّها معك\nنأسف لأن شيئًا لم يعمل كما ينبغي. ردّ على هذه الرسالة وأخبرنا بما حدث، وصورة الشاشة تساعدنا كثيرًا. نقرأ كل رسالة بأنفسنا وسنحلّ المشكلة معك.\n\nوتبقى باقتك مفعّلة حتى **{date}**، فيمكنك الاستمرار في استخدامها حتى ذلك الحين.",
+            'reason_not_needed_en' => "## Come back any time\nUntil **{date}** your plan keeps all its features, so it's a good time to finish anything you have planned. Whenever you need a voice-over again, your account will be here.",
+            'reason_not_needed_ar' => "## عُد متى شئت\nحتى **{date}** تبقى باقتك بكل مزاياها، فهو وقت مناسب لإنجاز ما خططت له. ومتى احتجت إلى تعليق صوتي من جديد، ستجد حسابك بانتظارك.",
+            'reason_other_en' => "## Tell us more\nThank you for telling us. If you'd like to say more, just reply to this email: we read every message ourselves.",
+            'reason_other_ar' => "## أخبرنا بالمزيد\nشكرًا لأنك أخبرتنا. وإن أردت أن تضيف شيئًا، يكفي أن تردّ على هذه الرسالة، فنحن نقرأ كل رسالة بأنفسنا.",
             // Cancelled another way (in Stripe), with no reason given.
-            'reason_none_en' => "If something wasn't what you hoped for, reply to this email and tell us: we read every message ourselves, and we'll help right away.",
-            'reason_none_ar' => 'إذا لم يكن شيء كما توقعت، ردّ على هذه الرسالة وأخبرنا، فنحن نقرأ كل رسالة بأنفسنا وسنساعدك فورًا.',
-            'keep_en' => 'Changed your mind? You can turn renewal back on any time before {date}:',
-            'keep_ar' => 'إذا غيّرت رأيك قبل {date}، يمكنك إعادة تفعيل التجديد بضغطة واحدة:',
+            'reason_none_en' => "## Tell us what happened\nIf something wasn't what you hoped for, reply to this email and tell us. We read every message ourselves, and we'll help right away.",
+            'reason_none_ar' => "## أخبرنا بما حدث\nإذا لم يكن شيء كما توقعت، ردّ على هذه الرسالة وأخبرنا. نقرأ كل رسالة بأنفسنا وسنساعدك فورًا.",
+            'keep_en' => "## Changed your mind?\nYou can turn renewal back on any time before {date}, with one click.",
+            'keep_ar' => "## غيّرت رأيك؟\nيمكنك إعادة تفعيل التجديد في أي وقت قبل {date} بضغطة واحدة.",
             'cta_label_en' => 'Keep my plan',
             'cta_label_ar' => 'أبقِ اشتراكي',
             'footer_en' => 'Thanks for being with us. The Listen team',
@@ -225,7 +226,11 @@ class CancellationEmail
                 return $text('price_fallback');
             }
 
-            return implode(' ', array_filter([$text('reason_price'), ...$options, $text('price_change')]));
+            return implode("\n\n", array_filter([
+                $text('reason_price'),
+                implode("\n", array_map(fn (string $option): string => '- '.$option, $options)),
+                $text('price_change'),
+            ]));
         }
 
         return $text('reason_'.(in_array($reason, SubscriptionCancellation::REASONS, true) ? $reason : 'none'));

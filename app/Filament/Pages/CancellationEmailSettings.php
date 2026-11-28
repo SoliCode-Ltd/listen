@@ -92,8 +92,8 @@ class CancellationEmailSettings extends Page implements HasForms
             TextInput::make('subject_'.$lang)->label('Subject')->required()->maxLength(200)->extraInputAttributes($rtl)->columnSpan(2),
             TextInput::make('headline_'.$lang)->label('Headline')->maxLength(200)->extraInputAttributes($rtl)
                 ->helperText($lang === 'en' ? $placeholders : null)->columnSpan(2),
-            Textarea::make('body_'.$lang)->label('What happens')->rows(4)->required()->extraInputAttributes($rtl)
-                ->helperText($lang === 'en' ? 'A blank line starts a new paragraph. **Words** between two pairs of stars are bold.' : null)->columnSpan(2),
+            Textarea::make('body_'.$lang)->label('What happens')->rows(8)->required()->extraInputAttributes($rtl)
+                ->helperText($lang === 'en' ? 'A blank line starts a new paragraph. A line starting "## " is a heading, lines starting "- " are a list, and **words** between two pairs of stars are bold.' : null)->columnSpan(2),
             Textarea::make('reason_price_'.$lang)->label('Reason: the price (opening)')->rows(2)->required()->extraInputAttributes($rtl)
                 ->helperText($lang === 'en' ? 'Followed only by what the member\'s plan really offers: the smaller plan line if a cheaper paid plan exists, the yearly line if their plan has a yearly price and they pay monthly ({percent} is the yearly saving in Billing settings), then the last line. With neither, the "price, nothing to offer" text goes instead.' : null)->columnSpan(2),
             TextInput::make('price_smaller_'.$lang)->label('Price: a smaller plan')->maxLength(300)->extraInputAttributes($rtl)->columnSpan(2),
@@ -105,7 +105,7 @@ class CancellationEmailSettings extends Page implements HasForms
             Textarea::make('reason_not_needed_'.$lang)->label('Reason: not needed right now')->rows(2)->required()->extraInputAttributes($rtl)->columnSpan(2),
             Textarea::make('reason_other_'.$lang)->label('Reason: something else')->rows(2)->required()->extraInputAttributes($rtl)->columnSpan(2),
             Textarea::make('reason_none_'.$lang)->label('No reason (cancelled in Stripe)')->rows(2)->required()->extraInputAttributes($rtl)->columnSpan(2),
-            TextInput::make('keep_'.$lang)->label('Just above the button')->maxLength(300)->extraInputAttributes($rtl)->columnSpan(2),
+            Textarea::make('keep_'.$lang)->label('Just above the button')->rows(2)->extraInputAttributes($rtl)->columnSpan(2),
             TextInput::make('cta_label_'.$lang)->label('Button text (opens Manage subscription)')->maxLength(80)->extraInputAttributes($rtl),
             TextInput::make('footer_'.$lang)->label('Small print at the bottom')->maxLength(300)->extraInputAttributes($rtl),
         ];

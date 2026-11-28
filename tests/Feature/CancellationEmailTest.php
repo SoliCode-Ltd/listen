@@ -71,13 +71,18 @@ class CancellationEmailTest extends TestCase
         // Two-language subjects read English first in every email of this design.
         $this->assertSame("Your Creator plan won't renew · تم إلغاء تجديد باقة مُبدع", $this->subjectOf($message));
         // What happens, with the plan's end date, in each language.
-        $this->assertStringContainsString('أهلاً Sara، ألغينا تجديد اشتراكك في باقة مُبدع كما طلبت.', $html);
+        $this->assertStringContainsString('أهلاً Sara،', $html);
+        $this->assertStringContainsString('ألغينا تجديد اشتراكك في باقة مُبدع كما طلبت.', $html);
+        $this->assertStringContainsString('ما الذي يحدث الآن', $html);
         $this->assertStringContainsString('15 ديسمبر 2026', $html);
-        $this->assertStringContainsString('Hi Sara, we&#039;ve cancelled the renewal of your Creator plan, as you asked.', $html);
+        $this->assertStringContainsString('Hi Sara,', $html);
+        $this->assertStringContainsString('We&#039;ve cancelled the renewal of your Creator plan, as you asked.', $html);
+        $this->assertStringContainsString('What happens now', $html);
+        $this->assertStringContainsString('until <strong style="font-weight:600;color:#16161D;">15 December 2026</strong>', $html);
         $this->assertStringContainsString('15 December 2026', $html);
         // No reason was given here (no cancel dialog): it invites a reply, and never repeats the dialog's list.
         $this->assertStringContainsString('إذا لم يكن شيء كما توقعت، ردّ على هذه الرسالة وأخبرنا', $html);
-        $this->assertStringContainsString('reply to this email and tell us: we read every message ourselves', $html);
+        $this->assertStringContainsString('reply to this email and tell us. We read every message ourselves', $html);
         $this->assertStringNotContainsString('with a number', $html);
         $this->assertStringNotContainsString('برقم', $html);
         // The way back, in both languages.
@@ -94,9 +99,9 @@ class CancellationEmailTest extends TestCase
     public function test_each_reason_gets_its_own_answer_with_something_to_stay_for(): void
     {
         $expect = [
-            'quality' => ['more than 200 dialects and accents', 'أكثر من 200 لهجة ولكنة'],
+            'quality' => ['More than 200 dialects and accents', 'أكثر من 200 لهجة ولكنة'],
             'technical' => ['a screenshot helps a lot', 'وصورة الشاشة تساعدنا كثيرًا'],
-            'not_needed' => ['you can come back whenever you need a voice-over again', 'يمكنك العودة متى احتجت إلى تعليق صوتي من جديد'],
+            'not_needed' => ['Whenever you need a voice-over again, your account will be here.', 'ومتى احتجت إلى تعليق صوتي من جديد'],
             'other' => ['If you&#039;d like to say more, just reply to this email', 'وإن أردت أن تضيف شيئًا'],
         ];
         foreach ($expect as $reason => [$en, $ar]) {
@@ -125,22 +130,26 @@ class CancellationEmailTest extends TestCase
         // The smallest paid plan, with no yearly price: nothing to offer, so it thanks them and asks what would work.
         $html = $this->sendAgain();
         $this->assertStringContainsString('If a plan or a price would work better for you', $html);
-        $this->assertStringNotContainsString('smaller plan', $html);
-        $this->assertStringNotContainsString('Paying yearly', $html);
+        $this->assertStringNotContainsString('A smaller plan', $html);
+        $this->assertStringNotContainsString('Yearly billing', $html);
 
         // A cheaper plan exists and theirs has a yearly price they don't pay yet: both, with the saving set in Billing settings.
         Plan::factory()->create(['slug' => 'starter', 'name' => 'Starter', 'price_cents' => 900, 'is_active' => true]);
         $creator->forceFill(['stripe_price_yearly' => 'price_creator_y'])->save();
         SiteSetting::set('billing_yearly_discount_percentage', '20', 'billing');
         $html = $this->sendAgain();
-        $this->assertStringContainsString('If the price was the reason, you may not need to leave to pay less. You can move to a smaller plan with fewer credits a month. Paying yearly saves you 20% compared with paying monthly. You can change your plan any time before 15 December 2026, from Manage subscription.', $html);
-        $this->assertStringContainsString('يمكنك الانتقال إلى باقة أصغر برصيد شهري أقل. ويوفّر لك الدفع السنوي 20% مقارنةً بالدفع الشهري.', $html);
+        $this->assertStringContainsString('Pay less, without leaving', $html);
+        $this->assertStringContainsString('A smaller plan</strong>, with fewer credits a month.', $html);
+        $this->assertStringContainsString('Yearly billing</strong>, which saves you 20% compared with paying monthly.', $html);
+        $this->assertStringContainsString('You can switch any time before 15 December 2026, from Manage subscription.', $html);
+        $this->assertStringContainsString('باقة أصغر</strong> برصيد شهري أقل.', $html);
+        $this->assertStringContainsString('ويوفّر لك 20% مقارنةً بالدفع الشهري.', $html);
 
         // Already paying yearly: only the smaller plan.
         BillingSubscription::query()->where('user_id', $this->member->id)->update(['stripe_price' => 'price_creator_y']);
         $html = $this->sendAgain();
-        $this->assertStringContainsString('You can move to a smaller plan', $html);
-        $this->assertStringNotContainsString('Paying yearly', $html);
+        $this->assertStringContainsString('A smaller plan', $html);
+        $this->assertStringNotContainsString('Yearly billing', $html);
     }
 
     public function test_the_webhook_after_the_site_sends_nothing_more(): void
@@ -204,9 +213,9 @@ class CancellationEmailTest extends TestCase
     {
         $email = app(CancellationEmail::class);
 
-        $this->assertStringContainsString('You can move to a smaller plan', $email->previewHtml(null, 'price'));
-        $this->assertStringContainsString('more than 200 dialects and accents', $email->previewHtml(null, 'quality'));
-        $this->assertStringContainsString('we read every message ourselves, and we&#039;ll help right away', $email->previewHtml(null, null));
+        $this->assertStringContainsString('A smaller plan', $email->previewHtml(null, 'price'));
+        $this->assertStringContainsString('More than 200 dialects and accents', $email->previewHtml(null, 'quality'));
+        $this->assertStringContainsString('We read every message ourselves, and we&#039;ll help right away', $email->previewHtml(null, null));
     }
 
     public function test_the_admin_sees_the_reasons_and_edits_the_email(): void
