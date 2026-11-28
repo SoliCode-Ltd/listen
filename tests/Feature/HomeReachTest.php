@@ -49,6 +49,21 @@ class HomeReachTest extends TestCase
         $page->assertSee('data/globe-land.json', false);
     }
 
+    public function test_the_real_numbers_stay_in_the_page_until_a_visitor_scrolls_them_into_view(): void
+    {
+        // Search engines read the page without scrolling; one caught the count-up halfway ("17 countries, +1,671").
+        $this->members(['EG' => 60, 'SA' => 30, 'US' => 10, 'DE' => 8, 'FR' => 7, 'MA' => 5]);
+        $html = (string) $this->getLocalizedRoute('home')->assertOk()->getContent();
+        $script = substr($html, strpos($html, '<section class="reach"'));
+        $script = substr($script, strpos($script, '<script>'), strpos($script, '</script>') - strpos($script, '<script>'));
+
+        // The numbers are only set back to zero inside the count-up, after a real scroll brought them into view.
+        $this->assertSame(1, substr_count($script, 'show(0)'));
+        $this->assertStringContainsString('if (e.isTrusted) { scrolled = true;', $script);
+        $this->assertLessThan(strpos($script, 'show(0)'), strpos($script, 'if (!scrolled) return;'));
+        $this->assertLessThan(strpos($script, 'show(0)'), strpos($script, 'new IntersectionObserver('));
+    }
+
     public function test_the_member_count_is_rounded_down_and_written_the_way_each_language_writes_it(): void
     {
         $this->members(['EG' => 12, 'SA' => 4, 'US' => 2, 'DE' => 1, 'FR' => 1]);

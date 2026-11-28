@@ -40,8 +40,10 @@
   </div>
 </section>
 <script>
-  // The numbers count up once, as they come into view; everything else is there from the start. Without this script,
-  // or with reduced motion, they simply show their value.
+  // The numbers count up once, when a visitor scrolls them into view; everything else is there from the start.
+  // Until then the page keeps the real numbers: search engines and AI tools read the page without scrolling, and
+  // one caught mid-count once listed "17 countries, +1,671 members". Numbers already on screen when the page opens,
+  // and reduced motion, show their value without counting.
   (function () {
     var section = document.currentScript.previousElementSibling;
     var stats = section && section.querySelector('.reach-stats');
@@ -52,10 +54,16 @@
       return el.dataset.plus === 'before' ? '+' + s : el.dataset.plus === 'after' ? s + '+' : s;
     };
     var show = function (k) { for (var i = 0; i < els.length; i++) els[i].textContent = fmt(Number(els[i].dataset.count) * k, els[i]); };
-    show(0);
+    var scrolled = false;
+    var onScroll = function (e) { if (e.isTrusted) { scrolled = true; window.removeEventListener('scroll', onScroll); } };
+    window.addEventListener('scroll', onScroll, { passive: true });
     var seen = new IntersectionObserver(function (entries) {
       if (!entries[0].isIntersecting) return;
       seen.disconnect();
+      window.removeEventListener('scroll', onScroll);
+      // On screen without the visitor scrolling (opened there, or read by a crawler): keep the real numbers.
+      if (!scrolled) return;
+      show(0);
       var t0 = performance.now();
       var step = function (now) {
         var t = Math.min(1, (now - t0) / 1800);
