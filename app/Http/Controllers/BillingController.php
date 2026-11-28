@@ -927,7 +927,7 @@ class BillingController extends Controller
         // A renewal still unpaid in its grace days: no paid period is left to run to
         // its end, so the subscription and the plan end now, as when the grace runs out.
         if ($this->cancelEndsNow($user, $subscription)) {
-            $record = $this->recordCancellation($user, $answer, true);
+            $record = $this->recordCancellation($user, $answer, true, (string) $subscription?->stripe_id);
             if (! $billingLifecycle->cancelDuringGrace($user)) {
                 $record->delete();
 
@@ -964,7 +964,7 @@ class BillingController extends Controller
         $booked = $this->planChanges->scheduledFor($user);
         // Saved before Stripe is told, so the email knows the reason whichever way it is sent
         // (from here, or from Stripe's webhook, which can arrive first).
-        $record = $this->recordCancellation($user, $answer, false);
+        $record = $this->recordCancellation($user, $answer, false, (string) $subscription->stripe_id);
         try {
             // Cancelling ends the plan at the renewal: a lower plan waiting for it is moot.
             $this->planChanges->releaseScheduleFor($subscription, 'cancelled');
@@ -1020,6 +1020,8 @@ class BillingController extends Controller
         try {
             $subscription->resume();
             $this->billingSyncService->syncIfStale($user, true);
+            // They kept their plan: the cancellation no longer counts (Billing → Cancellations).
+            rescue(fn () => app(\App\Services\Billing\CancellationLog::class)->markResumed((string) $subscription->stripe_id), null, false);
         } catch (\Throwable $exception) {
             Log::warning('Unable to resume Stripe subscription.', [
                 'user_id' => $user->id,
@@ -1800,7 +1802,7 @@ class BillingController extends Controller
      *
      * @param  array{reason?: string|null, note?: string|null}  $answer
      */
-    private function recordCancellation(User $user, array $answer, bool $endsNow): SubscriptionCancellation
+    private function recordCancellation(User $user, array $answer, bool $endsNow, string $stripeSubscriptionId = ''): SubscriptionCancellation
     {
         $plan = Subscription::query()->with('plan')->where('user_id', $user->id)->latest('id')->first()?->plan;
         $note = trim((string) ($answer['note'] ?? ''));
@@ -1809,6 +1811,9 @@ class BillingController extends Controller
             'user_id' => $user->id,
             'plan_id' => $plan?->id,
             'plan_name' => $plan?->name,
+            // Stripe tells the same cancellation a moment later; this keeps it counted once.
+            'stripe_subscription_id' => $stripeSubscriptionId !== '' ? $stripeSubscriptionId : null,
+            'source' => SubscriptionCancellation::SOURCE_SITE,
             'reason' => ($answer['reason'] ?? null) ?: null,
             'note' => $note !== '' ? $note : null,
             'locale' => app()->getLocale(),

@@ -25,12 +25,24 @@ class StripeWebhookEmailService
 
     public function sendForEvent(object $event): void
     {
+        $type = (string) ($event->type ?? '');
+        $object = $event->data->object ?? null;
+
+        // Billing → Cancellations counts every cancellation, whether or not billing emails
+        // are switched on, and a failure there never stops the email.
+        if (is_object($object) && str_starts_with($type, 'customer.subscription.')) {
+            $previous = $event->data->previous_attributes ?? null;
+            rescue(fn () => app(\App\Services\Billing\CancellationLog::class)->fromStripeEvent(
+                $type,
+                $object,
+                $this->hasAttribute($previous, 'cancel_at_period_end') || $this->hasAttribute($previous, 'cancel_at'),
+                $this->findUser((string) ($object->customer ?? ''))
+            ), null, false);
+        }
+
         if (! $this->emailsEnabled()) {
             return;
         }
-
-        $type = (string) ($event->type ?? '');
-        $object = $event->data->object ?? null;
 
         if (! is_object($object)) {
             return;

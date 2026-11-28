@@ -77,6 +77,9 @@ class SubscriptionCancellationResource extends Resource
                 TextColumn::make('note')->label('In their words')->wrap()->limit(160)->placeholder('—')->searchable()
                     ->extraAttributes(['dir' => 'auto']),
                 TextColumn::make('ends_at')->label('Plan ends')->date('j M Y')->placeholder('—')->sortable(),
+                TextColumn::make('source')->label('Where')->badge()->color('gray')
+                    ->formatStateUsing(fn (?string $state): string => SubscriptionCancellation::sourceLabel($state)),
+                TextColumn::make('resumed_at')->label('Kept their plan')->date('j M Y')->placeholder('—')->toggleable(),
                 IconColumn::make('ended_now')->label('Ended at once')->boolean()->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('locale')->label('Language')->badge()->toggleable(isToggledHiddenByDefault: true),
                 IconColumn::make('email_sent_at')->label('Email sent')->boolean()
@@ -88,6 +91,14 @@ class SubscriptionCancellationResource extends Resource
                     ->options(collect(SubscriptionCancellation::REASONS)
                         ->mapWithKeys(fn (string $reason): array => [$reason => SubscriptionCancellation::reasonLabel($reason)])
                         ->all()),
+                SelectFilter::make('source')->label('Where')->options([
+                    SubscriptionCancellation::SOURCE_SITE => SubscriptionCancellation::sourceLabel(SubscriptionCancellation::SOURCE_SITE),
+                    SubscriptionCancellation::SOURCE_STRIPE => SubscriptionCancellation::sourceLabel(SubscriptionCancellation::SOURCE_STRIPE),
+                    SubscriptionCancellation::SOURCE_IMPORT => SubscriptionCancellation::sourceLabel(SubscriptionCancellation::SOURCE_IMPORT),
+                ]),
+                Filter::make('kept')
+                    ->label('Kept their plan')
+                    ->query(fn (Builder $query): Builder => $query->whereNotNull('resumed_at')),
                 Filter::make('with_note')
                     ->label('Wrote something')
                     ->query(fn (Builder $query): Builder => $query->whereNotNull('note')),
