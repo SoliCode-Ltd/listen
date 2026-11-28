@@ -135,7 +135,8 @@ class CancellationEmailTest extends TestCase
 
         // A cheaper plan exists and theirs has a yearly price they don't pay yet: both, with the saving set in Billing settings.
         Plan::factory()->create(['slug' => 'starter', 'name' => 'Starter', 'price_cents' => 900, 'is_active' => true]);
-        $creator->forceFill(['stripe_price_yearly' => 'price_creator_y'])->save();
+        $creator->forceFill(['stripe_price_monthly' => 'price_creator_m', 'stripe_price_yearly' => 'price_creator_y'])->save();
+        BillingSubscription::query()->where('user_id', $this->member->id)->update(['stripe_price' => 'price_creator_m']);
         SiteSetting::set('billing_yearly_discount_percentage', '20', 'billing');
         $html = $this->sendAgain();
         $this->assertStringContainsString('Pay less, without leaving', $html);
@@ -149,6 +150,11 @@ class CancellationEmailTest extends TestCase
         BillingSubscription::query()->where('user_id', $this->member->id)->update(['stripe_price' => 'price_creator_y']);
         $html = $this->sendAgain();
         $this->assertStringContainsString('A smaller plan', $html);
+        $this->assertStringNotContainsString('Yearly billing', $html);
+
+        // On an older or special price (not the plan's monthly one): yearly is never offered on a guess.
+        BillingSubscription::query()->where('user_id', $this->member->id)->update(['stripe_price' => 'price_creator_legacy']);
+        $html = $this->sendAgain();
         $this->assertStringNotContainsString('Yearly billing', $html);
     }
 

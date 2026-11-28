@@ -166,8 +166,9 @@ class CancellationEmail
 
     /**
      * What this member could really do instead of leaving when the price was the reason:
-     * a smaller paid plan exists below theirs, and paying yearly saves (their plan has a
-     * yearly price, the saving is set, and they pay monthly today).
+     * a smaller paid plan exists below theirs; paying yearly saves, offered only when they
+     * are on their plan's monthly price today (an older or special price might already be
+     * yearly, so it is never offered on a guess) and their plan has a yearly price.
      *
      * @return array{smaller: bool, yearly_percent: int|null}
      */
@@ -182,10 +183,11 @@ class CancellationEmail
             ->exists();
 
         $percent = SiteSetting::yearlyDiscountPercent();
-        $paysYearly = $user !== null && trim((string) $plan->stripe_price_yearly) !== ''
+        $monthly = trim((string) $plan->stripe_price_monthly);
+        $paysMonthly = $user !== null && $monthly !== ''
             && BillingSubscription::query()->where('user_id', $user->id)->where('type', 'default')
-                ->latest('id')->value('stripe_price') === $plan->stripe_price_yearly;
-        $yearly = $percent > 0 && trim((string) $plan->stripe_price_yearly) !== '' && ! $paysYearly ? $percent : null;
+                ->latest('id')->value('stripe_price') === $monthly;
+        $yearly = $percent > 0 && $paysMonthly && trim((string) $plan->stripe_price_yearly) !== '' ? $percent : null;
 
         return ['smaller' => $smaller, 'yearly_percent' => $yearly];
     }
